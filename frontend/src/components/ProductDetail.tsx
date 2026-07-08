@@ -4,7 +4,7 @@ import {
   ArrowLeft, ShoppingCart, Star, Sun, Zap, CheckCircle,
   TrendingUp, Euro, Leaf, Info, ChevronDown, ChevronUp, Shield
 } from "lucide-react";
-import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
+import { ImageWithFallback } from "@/src/components/figma/ImageWithFallback";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";

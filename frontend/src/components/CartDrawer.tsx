@@ -2,8 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { X, ShoppingCart, Trash2 } from "lucide-react";
-import type { CartItem } from "@/providers/AppProvider";
-import { useApp } from "@/providers/AppProvider";
+import type { CartItem } from "@/src/providers/AppProvider";
 
 interface CartDrawerProps {
   cart: CartItem[];

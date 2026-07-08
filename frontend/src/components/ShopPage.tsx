@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { ShoppingCart, Star, ArrowRight, CheckCircle, Zap, Shield, Phone, ChevronRight, Sun, Battery, Cpu, Cable } from "lucide-react";
-import { ImageWithFallback } from "@/components/figma/ImageWithFallback";
+import { ImageWithFallback } from "@/src/components/figma/ImageWithFallback";
 
 interface Product {
   id: number;

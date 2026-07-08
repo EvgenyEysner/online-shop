@@ -12,7 +12,6 @@ import {
   Sun,
   LayoutDashboard,
 } from "lucide-react";
-import { useApp } from "@/providers/AppProvider";
 
 interface NavbarProps {
   cartCount: number;
