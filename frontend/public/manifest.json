@@ -1,0 +1,48 @@
+{
+  "name": "König 39 Solar & Elektro",
+  "short_name": "König 39",
+  "description": "Ihr Online-Shop für PV-Anlagen, Batteriespeicher und Elektroteile",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B2545",
+  "theme_color": "#0B2545",
+  "orientation": "portrait-primary",
+  "categories": ["shopping", "utilities"],
+  "lang": "de-DE",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-shop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "label": "Shop Startseite"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "PV-Anlagen",
+      "short_name": "PV-Shop",
+      "url": "/?category=pv",
+      "description": "Direkt zu den PV-Anlagen"
+    },
+    {
+      "name": "Mein Konto",
+      "short_name": "Dashboard",
+      "url": "/dashboard",
+      "description": "Bestellungen & Rechnungen"
+    }
+  ]
+}
