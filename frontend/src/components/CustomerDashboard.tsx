@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
+import type { User } from "@/src/types/user";
+import { getUserDisplayName, getUserInitials } from "@/src/types/user";
 import {
   LayoutDashboard, ShoppingBag, FileText, Zap, ChevronRight,
   Download, CheckCircle, Clock, Truck, Package, AlertCircle,
-  Sun, TrendingUp, Euro, LogOut, User, Bell, X
+  Sun, TrendingUp, Euro, LogOut, Bell, X
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
@@ -94,10 +96,11 @@ const statusConfig = {
 };
 
 interface CustomerDashboardProps {
+  user: User;
   onLogout: () => void;
 }
 
-export function CustomerDashboard({ onLogout }: CustomerDashboardProps) {
+export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
   const [activeTab, setActiveTab] = useState("overview");
   const [expandedOrder, setExpandedOrder] = useState<string | null>("K39-2024-0094");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -111,6 +114,9 @@ export function CustomerDashboard({ onLogout }: CustomerDashboardProps) {
 
   const totalSaved = pvMonthlyData.reduce((s, m) => s + m.eur, 0);
   const totalKwh = pvMonthlyData.reduce((s, m) => s + m.kwh, 0);
+  const displayName = getUserDisplayName(user);
+  const initials = getUserInitials(user);
+  const accountLabel = user.is_staff ? "Mitarbeiterkonto" : "Kundenkonto";
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -150,16 +156,20 @@ export function CustomerDashboard({ onLogout }: CustomerDashboardProps) {
         {/* User info */}
         <div className="px-4 py-4 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center">
-              <User size={18} className="text-accent" />
+            <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-accent text-xs font-bold">
+              {initials}
             </div>
-            <div>
-              <div className="text-white text-sm font-semibold">Max Mustermann</div>
-              <div className="text-white/40 text-xs">Kundennr. 10042</div>
+            <div className="min-w-0">
+              <div className="text-white text-sm font-semibold truncate">
+                {displayName}
+              </div>
+              <div className="text-white/40 text-xs truncate">{user.email}</div>
+              <div className="text-white/30 text-[0.65rem] mt-0.5">
+                {accountLabel} · {user.customer_number}
+              </div>
             </div>
           </div>
         </div>
-
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {tabs.map((tab) => {
@@ -209,7 +219,9 @@ export function CustomerDashboard({ onLogout }: CustomerDashboardProps) {
               <h1 className="text-foreground leading-none" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.05rem" }}>
                 {tabs.find(t => t.key === activeTab)?.label}
               </h1>
-              <p className="text-muted-foreground text-xs mt-0.5">König 39 Kundenportal</p>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                Willkommen zurück, {user.first_name || displayName}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -226,6 +238,35 @@ export function CustomerDashboard({ onLogout }: CustomerDashboardProps) {
           {/* OVERVIEW */}
           {activeTab === "overview" && (
             <div className="space-y-6">
+              <div className="bg-card border border-border rounded-xl p-5">
+                <h2
+                  className="text-foreground mb-4"
+                  style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1rem" }}
+                >
+                  Mein Profil
+                </h2>
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground text-xs mb-1">Name</dt>
+                    <dd className="text-foreground font-medium">{displayName}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs mb-1">E-Mail</dt>
+                    <dd className="text-foreground font-medium">{user.email}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs mb-1">Kundennummer</dt>
+                    <dd className="text-foreground font-medium">{user.customer_number}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs mb-1">Kontostatus</dt>
+                    <dd className="text-foreground font-medium">
+                      {user.is_active ? "Aktiv" : "Inaktiv"}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
               {/* KPI cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[

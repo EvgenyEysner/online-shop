@@ -10,6 +10,13 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     Custom User Model.
     """
 
+    customer_number = models.CharField(
+        "Kundennummer",
+        max_length=16,
+        unique=True,
+        blank=True,
+        null=True,
+    )
     email = models.EmailField(unique=True)  # unique
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)

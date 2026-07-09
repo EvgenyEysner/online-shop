@@ -7,7 +7,7 @@ import { CustomerDashboard } from "@/src/components/CustomerDashboard";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { logout, isLoggedIn, authLoading, openLogin } = useApp();
+  const { user, logout, isLoggedIn, authLoading, openLogin } = useApp();
 
   useEffect(() => {
     if (authLoading) return;
@@ -17,7 +17,7 @@ export default function DashboardPage() {
     }
   }, [authLoading, isLoggedIn, openLogin, router]);
 
-  if (authLoading || !isLoggedIn) {
+  if (authLoading || !isLoggedIn || !user) {
     return null;
   }
 
@@ -26,5 +26,5 @@ export default function DashboardPage() {
     router.push("/");
   };
 
-  return <CustomerDashboard onLogout={handleLogout} />;
+  return <CustomerDashboard user={user} onLogout={handleLogout} />;
 }
