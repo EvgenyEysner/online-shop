@@ -1,5 +1,6 @@
 from adrf import serializers
-from models import CustomUser
+
+from .models import CustomUser
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -13,10 +14,10 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "email",
+            "first_name",
+            "last_name",
             "is_active",
             "is_staff",
-            "date_joined",
             "password",
-            "employee",
         ]
-        read_only_fields = ["is_active", "is_staff", "is_superuser", "date_joined"]
+        read_only_fields = ["is_active", "is_staff", "is_superuser"]

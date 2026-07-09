@@ -1,13 +1,12 @@
 from adrf import viewsets
 from adrf.mixins import Response
-from django.http import Http404
-from models import CustomUser
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from serializers import UserSerializer
+
+from .serializers import UserSerializer
 
 
-class UserMeViewSet(viewsets.ModelViewSet):
+class UserMeViewSet(viewsets.GenericViewSet):
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
 

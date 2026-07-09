@@ -190,6 +190,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / env("DJANGO_STATIC_ROOT", default="staticfiles")
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / env("DJANGO_MEDIA_ROOT", default="media")
+
+API_DOCS_ENABLED: bool = env.bool("API_DOCS_ENABLED", default=True)
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
