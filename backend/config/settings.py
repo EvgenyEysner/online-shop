@@ -1,7 +1,7 @@
 import os
 from datetime import timedelta
 from pathlib import Path
-from typing import Tuple
+from typing import List, Tuple
 
 import environ
 
@@ -20,7 +20,7 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS").split(",")
 
-INSTALLED_APPS: Tuple[str, ...] = (
+DJANGO_APPS: Tuple[str, ...] = (
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -38,7 +38,10 @@ THIRD_PARTY_APPS: Tuple[str, ...] = (
     "drf_spectacular",
 )
 
-MIDDLEWARE = [
+LOCAL_APPS: Tuple[str, ...] = ("apps.accounts",)
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+
+MIDDLEWARE: List[str] = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
