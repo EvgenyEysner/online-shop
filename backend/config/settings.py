@@ -38,7 +38,9 @@ THIRD_PARTY_APPS: Tuple[str, ...] = (
 )
 
 LOCAL_APPS: Tuple[str, ...] = ("apps.accounts",)
-INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+INSTALLED_APPS = THIRD_PARTY_APPS + DJANGO_APPS + LOCAL_APPS
+
+AUTH_USER_MODEL = "accounts.CustomUser"
 
 MIDDLEWARE: List[str] = [
     "django.middleware.security.SecurityMiddleware",
