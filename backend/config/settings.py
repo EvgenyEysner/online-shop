@@ -4,9 +4,8 @@ from pathlib import Path
 from typing import List, Tuple
 
 import environ
-
-# from corsheaders.defaults import default_methods
-# from django.templatetags.static import static
+from corsheaders.defaults import default_methods
+from django.templatetags.static import static
 
 env = environ.Env(
     # set casting, default value
@@ -16,9 +15,9 @@ BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 
 # --- Take environment variables from .env file
 environ.Env.read_env(os.path.join(BASE_DIR, "../.env"))
-SECRET_KEY = env("SECRET_KEY")
-DEBUG = env("DEBUG")
-ALLOWED_HOSTS = env("ALLOWED_HOSTS").split(",")
+SECRET_KEY: str = env("SECRET_KEY")
+DEBUG: bool = env("DEBUG")
+ALLOWED_HOSTS: List[str] = env("ALLOWED_HOSTS").split(",")
 
 DJANGO_APPS: Tuple[str, ...] = (
     "django.contrib.admin",
@@ -56,7 +55,7 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [os.path.join(BASE_DIR, "templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -73,13 +72,91 @@ ASGI_APPLICATION = "config.asgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("DATABASE_NAME"),
+        "USER": env("DATABASE_USER"),
+        "PASSWORD": env("DATABASE_PASSWORD"),
+        "HOST": env("DATABASE_HOST"),
+        "PORT": env("DATABASE_PORT"),
     }
 }
 
-# Password validation
-# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
+UNFOLD = {
+    "SITE_TITLE": "Webseite Verwaltung",
+    "SITE_DROPDOWN": [
+        {
+            "icon": "diamond",
+            "title": "Garmonia Kosmetikstudio",
+            "link": "https://schoenheitsecke-oldenburg.de",
+        },
+    ],
+    "SITE_URL": "https://schoenheitsecke-oldenburg.de",
+    "SITE_LOGO": {
+        "light": lambda request: static("image/garmonia_logo_neu.webp"),
+        "dark": lambda request: static("image/garmonia_logo_neu.webp"),
+    },
+    "SITE_SYMBOL": "speed",
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": True,
+    "SHOW_BACK_BUTTON": False,
+    "THEME": "light",
+    "LOGIN": {
+        "image": lambda request: static("image/home-header.webp"),
+    },
+    "BORDER_RADIUS": "6px",
+    "COLORS": {
+        # Sand (Sekundär) – frontend --color-sand-*
+        "base": {
+            "50": "#fafaf9",
+            "100": "#f5f5f4",
+            "200": "#e7e5e4",
+            "300": "#d6d3d1",
+            "400": "#a8a29e",
+            "500": "#78716c",
+            "600": "#57534e",
+            "700": "#44403c",
+            "800": "#292524",
+            "900": "#1c1917",
+            "950": "#0c0a09",
+        },
+        # Gold (Primär) – frontend --color-gold-*
+        "primary": {
+            "50": "#faf7f2",
+            "100": "#f5ede0",
+            "200": "#ead9c0",
+            "300": "#dfc5a0",
+            "400": "#d4a373",
+            "500": "#c49363",
+            "600": "#b38353",
+            "700": "#8f6942",
+            "800": "#6b4f32",
+            "900": "#473521",
+            "950": "#2a1f14",
+        },
+        # Textfarben – frontend body, nav, placeholders
+        "font": {
+            "subtle-light": "#78716c",
+            "subtle-dark": "#a8a29e",
+            "default-light": "#44403c",
+            "default-dark": "#d6d3d1",
+            "important-light": "#1c1917",
+            "important-dark": "#f5f5f4",
+        },
+    },
+}
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_URLS_REGEX = "/api/.*"
+
+CORS_ALLOW_METHODS = default_methods
+
+CORS_ALLOWED_ORIGINS: List[str] = env.list(
+    "CORS_ALLOWED_ORIGINS",
+    default=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+)
 
 AUTH_PASSWORD_VALIDATORS = [
     {
