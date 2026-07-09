@@ -1,17 +1,23 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/src/providers/AppProvider";
 import { CustomerDashboard } from "@/src/components/CustomerDashboard";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { logout, isLoggedIn, openLogin } = useApp();
+  const { logout, isLoggedIn, authLoading, openLogin } = useApp();
 
-  // Redirect unauthenticated users
-  if (!isLoggedIn) {
-    openLogin();
-    router.replace("/");
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isLoggedIn) {
+      openLogin();
+      router.replace("/");
+    }
+  }, [authLoading, isLoggedIn, openLogin, router]);
+
+  if (authLoading || !isLoggedIn) {
     return null;
   }
 

@@ -44,6 +44,7 @@ AUTH_USER_MODEL = "accounts.CustomUser"
 
 MIDDLEWARE: List[str] = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",

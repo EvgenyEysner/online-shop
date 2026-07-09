@@ -2,11 +2,20 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
+  useEffect,
   useState,
   type ReactNode,
 } from "react";
 import type { ProductDetailData } from "@/src/components/ProductDetail";
+import {
+  clearTokens,
+  fetchCurrentUser,
+  login as loginRequest,
+  storeTokens,
+} from "@/src/lib/auth";
+import type { User } from "@/src/types/user";
 
 export interface CartItem {
   id: number;
@@ -29,8 +38,14 @@ interface AppContextValue {
   closeCart: () => void;
 
   // Auth
+  user: User | null;
   isLoggedIn: boolean;
-  login: () => void;
+  authLoading: boolean;
+  login: (
+    email: string,
+    password: string,
+    rememberMe?: boolean
+  ) => Promise<void>;
   logout: () => void;
 
   // Login modal
@@ -48,12 +63,37 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
   const [selectedProduct, setSelectedProduct] =
     useState<ProductDetailData | null>(null);
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
+  const isLoggedIn = user !== null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreSession() {
+      try {
+        const currentUser = await fetchCurrentUser();
+        if (!cancelled) setUser(currentUser);
+      } catch {
+        if (!cancelled) {
+          clearTokens();
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
+    }
+
+    restoreSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const addToCart = (product: ProductDetailData, qty = 1) => {
     setCart((prev) => {
@@ -71,8 +111,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const clearCart = () => setCart([]);
 
-  const login = () => { setIsLoggedIn(true); setShowLogin(false); };
-  const logout = () => setIsLoggedIn(false);
+  const login = useCallback(
+    async (email: string, password: string, rememberMe = true) => {
+      const tokens = await loginRequest(email, password);
+      storeTokens(tokens, rememberMe);
+      const currentUser = await fetchCurrentUser(tokens.access);
+      setUser(currentUser);
+      setShowLogin(false);
+    },
+    []
+  );
+
+  const logout = useCallback(() => {
+    clearTokens();
+    setUser(null);
+  }, []);
 
   return (
     <AppContext.Provider
@@ -85,7 +138,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         showCart,
         openCart: () => setShowCart(true),
         closeCart: () => setShowCart(false),
+        user,
         isLoggedIn,
+        authLoading,
         login,
         logout,
         showLogin,
@@ -114,8 +169,10 @@ export function useApp() {
       showCart: false,
       openCart: () => {},
       closeCart: () => {},
+      user: null,
       isLoggedIn: false,
-      login: () => {},
+      authLoading: true,
+      login: async () => {},
       logout: () => {},
       showLogin: false,
       openLogin: () => {},
