@@ -1,6 +1,7 @@
 from adrf import serializers
 from asgiref.sync import sync_to_async
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError
 
 from .models import CustomUser
@@ -33,7 +34,11 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise ValidationError(
                 {"password_confirm": "Passwörter stimmen nicht überein."}
             )
-        validate_password(attrs["password"])
+
+        try:
+            validate_password(attrs["password"])
+        except DjangoValidationError as exc:
+            raise ValidationError({"password": exc.messages}) from exc
         return attrs
 
     async def acreate(self, validated_data):

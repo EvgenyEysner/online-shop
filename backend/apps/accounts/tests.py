@@ -80,6 +80,38 @@ class RegisterViewTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_sign_up_rejects_password_without_digit(self):
+        response = self.client.post(
+            "/api/v1/sign-up/",
+            {
+                "email": "weak@example.com",
+                "first_name": "Max",
+                "last_name": "Mustermann",
+                "password": "SecurePass!",
+                "password_confirm": "SecurePass!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password", response.data)
+
+    def test_sign_up_rejects_password_without_special_character(self):
+        response = self.client.post(
+            "/api/v1/sign-up/",
+            {
+                "email": "weak2@example.com",
+                "first_name": "Max",
+                "last_name": "Mustermann",
+                "password": "SecurePass123",
+                "password_confirm": "SecurePass123",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password", response.data)
+
     def test_customer_number_not_accepted_from_client(self):
         response = self.client.post(
             "/api/v1/sign-up/",
