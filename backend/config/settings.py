@@ -37,7 +37,7 @@ THIRD_PARTY_APPS: Tuple[str, ...] = (
     "drf_spectacular",
 )
 
-LOCAL_APPS: Tuple[str, ...] = ("apps.accounts",)
+LOCAL_APPS: Tuple[str, ...] = ("apps.accounts", "apps.orders")
 INSTALLED_APPS = THIRD_PARTY_APPS + DJANGO_APPS + LOCAL_APPS
 
 AUTH_USER_MODEL = "accounts.CustomUser"
