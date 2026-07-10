@@ -2,7 +2,7 @@
 
 import {FormEvent, useState} from "react";
 import {Loader2, Sun, X} from "lucide-react";
-import {ApiError} from "@/src/lib/api";
+import {ApiError, type ApiFieldErrors} from "@/src/lib/api";
 
 interface LoginModalProps {
     onClose: () => void;
@@ -21,11 +21,17 @@ interface LoginModalProps {
     ) => Promise<void>;
 }
 
+const emptyRegisterErrors = {
+    general: [] as string[],
+    fields: {} as ApiFieldErrors,
+};
+
 export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [rememberMe, setRememberMe] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [loginError, setLoginError] = useState<string | null>(null);
+    const [registerErrors, setRegisterErrors] = useState(emptyRegisterErrors);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Register state
@@ -37,9 +43,15 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
 
     const [mode, setMode] = useState<"login" | "register">("login");
 
+    const switchMode = (nextMode: "login" | "register") => {
+        setMode(nextMode);
+        setLoginError(null);
+        setRegisterErrors(emptyRegisterErrors);
+    };
+
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
-        setError(null);
+        setLoginError(null);
         setIsSubmitting(true);
 
         try {
@@ -47,9 +59,10 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
         } catch (err) {
             const message =
                 err instanceof ApiError
-                    ? err.message
+                    ? [...err.generalErrors, ...Object.values(err.fieldErrors).flat()].join(" ") ||
+                    err.message
                     : "Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.";
-            setError(message);
+            setLoginError(message);
         } finally {
             setIsSubmitting(false);
         }
@@ -57,7 +70,7 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
 
     const handleRegister = async (event: FormEvent) => {
         event.preventDefault();
-        setError(null);
+        setRegisterErrors(emptyRegisterErrors);
         setIsSubmitting(true);
 
         try {
@@ -69,14 +82,21 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                 regPasswordConfirm
             );
         } catch (err) {
-            const message = err instanceof ApiError
-                ? err.message
-                : "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.";
-            setError(message);
+            if (err instanceof ApiError) {
+                setRegisterErrors({
+                    general: err.generalErrors,
+                    fields: err.fieldErrors,
+                });
+            } else {
+                setRegisterErrors({
+                    general: ["Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut."],
+                    fields: {},
+                });
+            }
         } finally {
             setIsSubmitting(false);
         }
-    }
+    };
 
     return (
         <div className="p-6 space-y-4">
@@ -111,13 +131,13 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                     {/* Tab switcher */}
                     <div className="flex border-b border-border">
                         <button
-                            onClick={() => setMode("login")}
+                            onClick={() => switchMode("login")}
                             className={`flex-1 py-3 text-sm font-semibold transition-colors ${mode === "login" ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
                         >
                             Anmelden
                         </button>
                         <button
-                            onClick={() => setMode("register")}
+                            onClick={() => switchMode("register")}
                             className={`flex-1 py-3 text-sm font-semibold transition-colors ${mode === "register" ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
                         >
                             Registrieren
@@ -177,10 +197,10 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                                 </a>
                             </div>
 
-                            {error && (
+                            {loginError && (
                                 <div
                                     className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-xs text-destructive">
-                                    {error}
+                                    {loginError}
                                 </div>
                             )}
 
@@ -201,7 +221,9 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                             </button>
                             <p className="text-center text-muted-foreground text-xs">
                                 Noch kein Konto?{" "}
-                                <a href="#" className="text-accent font-semibold hover:underline">
+                                <a href="#"
+                                   onClick={() => switchMode("register")}
+                                   className="text-accent font-semibold hover:underline">
                                     Registrieren
                                 </a>
                             </p>
@@ -227,6 +249,7 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                                         disabled={isSubmitting}
                                         className="w-full px-3 py-2.5 bg-input-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
                                     />
+                                    <FieldErrors messages={registerErrors.fields.first_name}/>
                                 </div>
                                 <div>
                                     <label
@@ -245,6 +268,7 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                                         disabled={isSubmitting}
                                         className="w-full px-3 py-2.5 bg-input-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
                                     />
+                                    <FieldErrors messages={registerErrors.fields.last_name}/>
                                 </div>
                             </div>
                             <div>
@@ -264,6 +288,7 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                                     disabled={isSubmitting}
                                     className="w-full px-3 py-2.5 bg-input-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
                                 />
+                                <FieldErrors messages={registerErrors.fields.email}/>
                             </div>
                             <div>
                                 <label
@@ -282,6 +307,7 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                                     disabled={isSubmitting}
                                     className="w-full px-3 py-2.5 bg-input-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
                                 />
+                                <FieldErrors messages={registerErrors.fields.password}/>
                             </div>
                             <div>
                                 <label
@@ -300,6 +326,7 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                                     disabled={isSubmitting}
                                     className="w-full px-3 py-2.5 bg-input-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
                                 />
+                                <FieldErrors messages={registerErrors.fields.password_confirm}/>
                             </div>
                             <div className="flex items-center justify-between text-xs">
                                 <p className="text-muted-foreground text-xs text-center">
@@ -309,10 +336,10 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                                 </p>
                             </div>
 
-                            {error && (
+                            {registerErrors.general.length > 0 && (
                                 <div
                                     className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-xs text-destructive">
-                                    {error}
+                                    <ErrorList messages={registerErrors.general}/>
                                 </div>
                             )}
 
@@ -336,5 +363,35 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                 </div>
             </div>
         </div>
+    );
+}
+
+function FieldErrors({messages}: { messages?: string[] }) {
+    if (!messages?.length) return null;
+
+    return (
+        <ul className="mt-1.5 space-y-1">
+            {messages.map((message, index) => (
+                <li key={`${message}-${index}`} className="text-xs text-destructive">
+                    {message}
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+function ErrorList({messages}: { messages: string[] }) {
+    if (messages.length === 0) return null;
+
+    if (messages.length === 1) {
+        return <p>{messages[0]}</p>;
+    }
+
+    return (
+        <ul className="list-disc pl-4 space-y-1">
+            {messages.map((message, index) => (
+                <li key={`${message}-${index}`}>{message}</li>
+            ))}
+        </ul>
     );
 }
