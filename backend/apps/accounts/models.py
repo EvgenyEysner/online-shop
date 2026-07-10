@@ -2,6 +2,7 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import PermissionsMixin
 from django.db import models
 
+from apps.utils.helpers import Address
 from .managers import UserManager
 
 
@@ -20,6 +21,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)  # unique
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
+
+    street = models.CharField("Straße", max_length=255)
+    street_no = models.CharField("Hausnummer", max_length=255, blank=True)
+    zip_code = models.CharField("PLZ", max_length=5)
+    city = models.CharField("Ort", max_length=255)
+    country = models.CharField("Land", max_length=255, default="Deutschland")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -51,6 +58,16 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
+
+    def address(self) -> Address:
+        return Address(
+            recipient=self.full_name,
+            street=self.street,
+            street_no=self.street_no,
+            zip_code=self.zip_code,
+            city=self.city,
+            country=self.country,
+        )
 
     def __str__(self):
         return self.email
