@@ -1,4 +1,3 @@
-from apps.accounts.routers import router
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -10,11 +9,15 @@ from drf_spectacular.views import (
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from apps.accounts.routers import router as account_router
+from apps.orders.routers import router as order_router
+
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/v1/", include(router.urls)),
-    path("api/v1/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
-    path("api/v1/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/v1/accounts/", include(account_router.urls)),
+    path("api/v1/orders/", include(order_router.urls)),
+    path("api/v1/login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/v1/login/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 ]
 
 if settings.DEBUG:

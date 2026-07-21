@@ -68,5 +68,5 @@ class UserSerializer(serializers.ModelSerializer):
             "full_name",
         ]
 
-    async def get_full_name(self, obj):
+    async def get_full_name(self, obj) -> str:
         return obj.full_name
