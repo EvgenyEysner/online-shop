@@ -1,12 +1,18 @@
 from adrf import mixins, viewsets
-
-# from drf_spectacular.utils import extend_schema_view, extend_schema
+from adrf.mixins import Response, get_data
+from asgiref.sync import sync_to_async
+from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 
 from apps.orders.models import Item, Order, OrderItem
-from apps.orders.serializers import ItemSerializer, OrderSerializer, OrderItemSerializer
+from apps.orders.serializers import (
+    CartSerializer,
+    ItemSerializer,
+    OrderItemSerializer,
+    OrderSerializer,
+)
 
 
 class Pagination(PageNumberPagination):
@@ -51,3 +57,25 @@ class OrderItemViewSet(
     pagination_class = Pagination
     queryset = OrderItem.objects.select_related("order", "item").all()
     serializer_class = OrderItemSerializer
+
+
+class CartViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = CartSerializer
+
+    async def acreate(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        await sync_to_async(serializer.is_valid)(raise_exception=True)
+        order = await serializer.asave()
+
+        # --- Send mail with order data --- #
+        # Todo: Check the celery task
+        # order_created.delay(order.id)
+
+        order_data = await get_data(
+            OrderSerializer(
+                order,
+                context=self.get_serializer_context(),
+            )
+        )
+        return Response(order_data, status=status.HTTP_201_CREATED)

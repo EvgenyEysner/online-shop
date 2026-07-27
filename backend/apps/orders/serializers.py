@@ -1,9 +1,12 @@
 from decimal import Decimal
 
 from adrf import serializers
-from rest_framework.relations import SlugRelatedField
+from asgiref.sync import sync_to_async
+from rest_framework.exceptions import ValidationError
+from rest_framework.relations import PrimaryKeyRelatedField, SlugRelatedField
 
 from apps.orders.models import Category, Item, Order, OrderItem
+from apps.orders.services import OrderService
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -56,3 +59,28 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = "__all__"
+
+
+class CartItemWriteSerializer(serializers.Serializer):
+    item = PrimaryKeyRelatedField(queryset=Item.objects.all())
+    quantity = serializers.IntegerField(min_value=1)
+
+
+class CartSerializer(serializers.Serializer):
+    note = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, max_length=256
+    )
+    items = CartItemWriteSerializer(many=True)
+
+    def validate_items(self, value):
+        if not value:
+            raise ValidationError("Warenkorb darf nicht leer sein.")
+        return value
+
+    async def acreate(self, validated_data):
+        request = self.context["request"]
+        return await sync_to_async(OrderService.create_order)(
+            request.user,
+            validated_data.get("note"),
+            validated_data["items"],
+        )
