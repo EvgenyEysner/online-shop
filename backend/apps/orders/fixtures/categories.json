@@ -1,0 +1,42 @@
+[
+  {
+    "model": "orders.category",
+    "pk": 1,
+    "fields": {
+      "name": "PV-Anlagen",
+      "slug": "pv",
+      "sublabel": "Solarmodule & Wechselrichter",
+      "image_url": "https://images.unsplash.com/photo-1663321508309-4ceb96a3c791?w=600&h=400&fit=crop&auto=format"
+    }
+  },
+  {
+    "model": "orders.category",
+    "pk": 2,
+    "fields": {
+      "name": "Batteriespeicher",
+      "slug": "battery",
+      "sublabel": "Stromspeicher & Hybridsysteme",
+      "image_url": "https://images.unsplash.com/photo-1635335874521-7987db781153?w=600&h=400&fit=crop&auto=format"
+    }
+  },
+  {
+    "model": "orders.category",
+    "pk": 3,
+    "fields": {
+      "name": "Elektroteile",
+      "slug": "parts",
+      "sublabel": "Kabel, Stecker & Komponenten",
+      "image_url": "https://images.unsplash.com/photo-1544724569-5f546fd6f2b5?w=600&h=400&fit=crop&auto=format"
+    }
+  },
+  {
+    "model": "orders.category",
+    "pk": 4,
+    "fields": {
+      "name": "Leitungen",
+      "slug": "cables",
+      "sublabel": "Energie- & Steuerleitungen",
+      "image_url": "https://images.unsplash.com/photo-1635335874521-7987db781153?w=600&h=400&fit=crop&auto=format"
+    }
+  }
+]

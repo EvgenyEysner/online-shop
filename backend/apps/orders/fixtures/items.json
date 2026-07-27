@@ -1,0 +1,336 @@
+[
+  {
+    "model": "orders.item",
+    "pk": 1,
+    "fields": {
+      "name": "Q CELLS Q.PEAK DUO ML-G10+ 400W",
+      "description": "Monokristallines Hochleistungsmodul mit Anti-LID Technologie",
+      "image_url": "https://images.unsplash.com/photo-1663321508309-4ceb96a3c791?w=400&h=300&fit=crop&auto=format",
+      "manufacturer_number": "Q.PEAK-DUO-ML-G10-400",
+      "category": 1,
+      "price": "189.00",
+      "original_price": "219.00",
+      "unit": 1,
+      "power_label": "400 Wp",
+      "badge": "Bestseller",
+      "rating": "4.9",
+      "reviews": 142,
+      "specs": [
+        {
+          "label": "Zelltyp",
+          "value": "Monokristallin PERC"
+        },
+        {
+          "label": "Modulwirkungsgrad",
+          "value": "21,4 %"
+        },
+        {
+          "label": "Leerlaufspannung (Voc)",
+          "value": "49,6 V"
+        },
+        {
+          "label": "Kurzschlussstrom (Isc)",
+          "value": "10,72 A"
+        },
+        {
+          "label": "Temperaturkoeffizient (Pmax)",
+          "value": "−0,34 % / °C"
+        },
+        {
+          "label": "Abmessungen",
+          "value": "1.722 × 1.134 × 35 mm"
+        },
+        {
+          "label": "Gewicht",
+          "value": "21,8 kg"
+        },
+        {
+          "label": "Schutzklasse",
+          "value": "IP68"
+        },
+        {
+          "label": "Garantie Leistung",
+          "value": "10 Jahre Produkt / 25 Jahre Leistung"
+        },
+        {
+          "label": "Zertifizierung",
+          "value": "IEC 61215, IEC 61730, CE"
+        }
+      ],
+      "on_stock": 120,
+      "min_stock": 10,
+      "ean": "4001000000001"
+    }
+  },
+  {
+    "model": "orders.item",
+    "pk": 2,
+    "fields": {
+      "name": "Huawei SUN2000-5KTL-M1 Wechselrichter",
+      "description": "Smart String Wechselrichter 5 kW mit integriertem WLAN",
+      "image_url": "https://images.unsplash.com/photo-1544724569-5f546fd6f2b5?w=400&h=300&fit=crop&auto=format",
+      "manufacturer_number": "SUN2000-5KTL-M1",
+      "category": 1,
+      "price": "849.00",
+      "original_price": null,
+      "unit": 1,
+      "power_label": "5 kW",
+      "badge": "Empfohlen",
+      "rating": "4.8",
+      "reviews": 98,
+      "specs": [
+        {
+          "label": "Zelltyp",
+          "value": "Monokristallin PERC"
+        },
+        {
+          "label": "Modulwirkungsgrad",
+          "value": "21,4 %"
+        },
+        {
+          "label": "Leerlaufspannung (Voc)",
+          "value": "49,6 V"
+        },
+        {
+          "label": "Kurzschlussstrom (Isc)",
+          "value": "10,72 A"
+        },
+        {
+          "label": "Temperaturkoeffizient (Pmax)",
+          "value": "−0,34 % / °C"
+        },
+        {
+          "label": "Abmessungen",
+          "value": "1.722 × 1.134 × 35 mm"
+        },
+        {
+          "label": "Gewicht",
+          "value": "21,8 kg"
+        },
+        {
+          "label": "Schutzklasse",
+          "value": "IP68"
+        },
+        {
+          "label": "Garantie Leistung",
+          "value": "10 Jahre Produkt / 25 Jahre Leistung"
+        },
+        {
+          "label": "Zertifizierung",
+          "value": "IEC 61215, IEC 61730, CE"
+        }
+      ],
+      "on_stock": 45,
+      "min_stock": 5,
+      "ean": "4001000000002"
+    }
+  },
+  {
+    "model": "orders.item",
+    "pk": 3,
+    "fields": {
+      "name": "AlphaESS SMILE5 Batteriespeicher",
+      "description": "Dreiphasiger Hybridwechselrichter 5 kW mit 10,1 kWh Speicher",
+      "image_url": "https://images.unsplash.com/photo-1635335874521-7987db781153?w=400&h=300&fit=crop&auto=format",
+      "manufacturer_number": "SMILE5-10.1",
+      "category": 2,
+      "price": "4299.00",
+      "original_price": "4799.00",
+      "unit": 1,
+      "power_label": "10,1 kWh",
+      "badge": "Angebot",
+      "rating": "4.7",
+      "reviews": 63,
+      "specs": [
+        {
+          "label": "Kapazität",
+          "value": "10,1 kWh"
+        },
+        {
+          "label": "Nutzbare Kapazität",
+          "value": "9,6 kWh"
+        },
+        {
+          "label": "Wirkungsgrad",
+          "value": "97 %"
+        },
+        {
+          "label": "Zyklenzahl",
+          "value": "> 6.000 Zyklen"
+        },
+        {
+          "label": "Anschluss",
+          "value": "Dreiphasig"
+        },
+        {
+          "label": "Schutzklasse",
+          "value": "IP55"
+        },
+        {
+          "label": "Garantie",
+          "value": "10 Jahre"
+        }
+      ],
+      "on_stock": 18,
+      "min_stock": 2,
+      "ean": "4001000000003"
+    }
+  },
+  {
+    "model": "orders.item",
+    "pk": 4,
+    "fields": {
+      "name": "Victron Energy SmartSolar MPPT 100/50",
+      "description": "Bluetooth Solar-Laderegler mit Remote-Konfiguration",
+      "image_url": "https://images.unsplash.com/photo-1544724569-5f546fd6f2b5?w=400&h=300&fit=crop&auto=format",
+      "manufacturer_number": "MPPT-100-50",
+      "category": 3,
+      "price": "299.00",
+      "original_price": null,
+      "unit": 1,
+      "power_label": "100V / 50A",
+      "badge": "Top-Qualität",
+      "rating": "4.9",
+      "reviews": 211,
+      "specs": [
+        {
+          "label": "Material",
+          "value": "Kupfer, verzinnt"
+        },
+        {
+          "label": "Querschnitt",
+          "value": "6 mm²"
+        },
+        {
+          "label": "Nennspannung",
+          "value": "1.500 V DC"
+        },
+        {
+          "label": "Temperaturbereich",
+          "value": "−40 °C bis +90 °C"
+        },
+        {
+          "label": "Norm",
+          "value": "EN 50618 / IEC 62930"
+        },
+        {
+          "label": "UV-Beständigkeit",
+          "value": "25 Jahre"
+        }
+      ],
+      "on_stock": 80,
+      "min_stock": 8,
+      "ean": "4001000000004"
+    }
+  },
+  {
+    "model": "orders.item",
+    "pk": 5,
+    "fields": {
+      "name": "Fronius Symo 8.2-3-M Wechselrichter",
+      "description": "Dreiphasiger Netzwechselrichter 8,2 kW mit DataManager",
+      "image_url": "https://images.unsplash.com/photo-1663321508309-4ceb96a3c791?w=400&h=300&fit=crop&auto=format",
+      "manufacturer_number": "SYMO-8.2-3-M",
+      "category": 1,
+      "price": "1249.00",
+      "original_price": null,
+      "unit": 1,
+      "power_label": "8,2 kW",
+      "badge": "",
+      "rating": "4.8",
+      "reviews": 77,
+      "specs": [
+        {
+          "label": "Zelltyp",
+          "value": "Monokristallin PERC"
+        },
+        {
+          "label": "Modulwirkungsgrad",
+          "value": "21,4 %"
+        },
+        {
+          "label": "Leerlaufspannung (Voc)",
+          "value": "49,6 V"
+        },
+        {
+          "label": "Kurzschlussstrom (Isc)",
+          "value": "10,72 A"
+        },
+        {
+          "label": "Temperaturkoeffizient (Pmax)",
+          "value": "−0,34 % / °C"
+        },
+        {
+          "label": "Abmessungen",
+          "value": "1.722 × 1.134 × 35 mm"
+        },
+        {
+          "label": "Gewicht",
+          "value": "21,8 kg"
+        },
+        {
+          "label": "Schutzklasse",
+          "value": "IP68"
+        },
+        {
+          "label": "Garantie Leistung",
+          "value": "10 Jahre Produkt / 25 Jahre Leistung"
+        },
+        {
+          "label": "Zertifizierung",
+          "value": "IEC 61215, IEC 61730, CE"
+        }
+      ],
+      "on_stock": 32,
+      "min_stock": 4,
+      "ean": "4001000000005"
+    }
+  },
+  {
+    "model": "orders.item",
+    "pk": 6,
+    "fields": {
+      "name": "Photovoltaik-Kabel 6mm² rot/schwarz",
+      "description": "UV-beständiges Solar DC-Kabel, doppelt isoliert, Meterware",
+      "image_url": "https://images.unsplash.com/photo-1635335874521-7987db781153?w=400&h=300&fit=crop&auto=format",
+      "manufacturer_number": "PV-CABLE-6MM",
+      "category": 3,
+      "price": "1.89",
+      "original_price": null,
+      "unit": 2,
+      "power_label": "per Meter",
+      "badge": "",
+      "rating": "4.6",
+      "reviews": 445,
+      "specs": [
+        {
+          "label": "Material",
+          "value": "Kupfer, verzinnt"
+        },
+        {
+          "label": "Querschnitt",
+          "value": "6 mm²"
+        },
+        {
+          "label": "Nennspannung",
+          "value": "1.500 V DC"
+        },
+        {
+          "label": "Temperaturbereich",
+          "value": "−40 °C bis +90 °C"
+        },
+        {
+          "label": "Norm",
+          "value": "EN 50618 / IEC 62930"
+        },
+        {
+          "label": "UV-Beständigkeit",
+          "value": "25 Jahre"
+        }
+      ],
+      "on_stock": 500,
+      "min_stock": 50,
+      "ean": "4001000000006"
+    }
+  }
+]

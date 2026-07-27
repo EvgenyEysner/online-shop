@@ -6,9 +6,10 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 
-from apps.orders.models import Item, Order, OrderItem
+from apps.orders.models import Category, Item, Order, OrderItem
 from apps.orders.serializers import (
     CartSerializer,
+    CategorySerializer,
     ItemSerializer,
     OrderItemSerializer,
     OrderSerializer,
@@ -19,6 +20,13 @@ class Pagination(PageNumberPagination):
     page_size = 10
     page_size_query_param = "page_size"
     max_page_size = 300
+
+
+class CategoryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = CategorySerializer
+    queryset = Category.objects.all()
+    pagination_class = None
 
 
 class ItemsViewSet(

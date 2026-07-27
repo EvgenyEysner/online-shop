@@ -8,6 +8,14 @@ User = get_user_model()
 
 class Category(models.Model):
     name = models.CharField("Kategorie", max_length=128)
+    slug = models.SlugField("Schlüssel", max_length=64, unique=True)
+    sublabel = models.CharField("Untertitel", max_length=128, blank=True)
+    image_url = models.URLField("Bild-URL", blank=True)
+
+    class Meta:
+        verbose_name = "Kategorie"
+        verbose_name_plural = "Kategorien"
+        ordering = ("name",)
 
     def __str__(self):
         return self.name
@@ -19,9 +27,9 @@ class Item(models.Model):
         METER = 2, "Meter"
         ROLL = 3, "Rolle"
 
-    name = models.CharField("Bezeichnung", max_length=64)
+    name = models.CharField("Bezeichnung", max_length=128)
     description = models.TextField(
-        "Beschreibung", max_length=256, null=True, blank=True
+        "Beschreibung", max_length=512, null=True, blank=True
     )
     image = models.ImageField(
         verbose_name="Artikelbild",
@@ -30,6 +38,7 @@ class Item(models.Model):
         blank=True,
         default="default-product-image.jpg",
     )
+    image_url = models.URLField("Externe Bild-URL", blank=True)
     manufacturer_number = models.CharField(
         "Hersteller Artikelnummer", max_length=64, blank=True
     )
@@ -42,11 +51,27 @@ class Item(models.Model):
         verbose_name="Kategorie",
     )
     price = models.DecimalField("Preis", max_digits=10, decimal_places=2)
+    original_price = models.DecimalField(
+        "UVP / Streichpreis",
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     unit = models.PositiveSmallIntegerField(
         choices=UnitChoices.choices,
         default=UnitChoices.PIECES,
         verbose_name="Maßeinheit",
     )
+    power_label = models.CharField(
+        "Leistung / Kennwert", max_length=64, blank=True
+    )
+    badge = models.CharField("Badge", max_length=64, blank=True)
+    rating = models.DecimalField(
+        "Bewertung", max_digits=2, decimal_places=1, default=Decimal("0.0")
+    )
+    reviews = models.PositiveIntegerField("Anzahl Bewertungen", default=0)
+    specs = models.JSONField("Technische Daten", default=list, blank=True)
 
     on_stock = models.PositiveSmallIntegerField(verbose_name="Lagerbestand", default=0)
     min_stock = models.PositiveSmallIntegerField(
@@ -59,7 +84,7 @@ class Item(models.Model):
 
     @property
     def tax(self) -> Decimal:
-        return self.price * Decimal(0.19)
+        return self.price * Decimal("0.19")
 
     class Meta:
         verbose_name = "Artikel"

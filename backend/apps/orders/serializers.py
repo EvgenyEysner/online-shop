@@ -12,23 +12,32 @@ from apps.orders.services import OrderService
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = "__all__"
+        fields = ["id", "name", "slug", "sublabel", "image_url"]
 
 
 class ItemSerializer(serializers.ModelSerializer):
     tax = serializers.SerializerMethodField(read_only=True)
     category = serializers.SerializerMethodField(read_only=True)
+    image = serializers.SerializerMethodField(read_only=True)
+    watt = serializers.CharField(source="power_label", read_only=True)
 
     class Meta:
         model = Item
         fields = [
+            "id",
             "name",
             "description",
             "image",
             "manufacturer_number",
             "category",
             "price",
+            "original_price",
             "unit",
+            "watt",
+            "badge",
+            "rating",
+            "reviews",
+            "specs",
             "on_stock",
             "min_stock",
             "ean",
@@ -41,7 +50,18 @@ class ItemSerializer(serializers.ModelSerializer):
     def get_category(self, obj) -> str | None:
         if obj.category_id is None:
             return None
-        return obj.category.name
+        return obj.category.slug
+
+    def get_image(self, obj) -> str:
+        if obj.image_url:
+            return obj.image_url
+        if obj.image:
+            request = self.context.get("request")
+            url = obj.image.url
+            if request is not None:
+                return request.build_absolute_uri(url)
+            return url
+        return ""
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
