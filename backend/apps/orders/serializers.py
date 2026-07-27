@@ -44,15 +44,15 @@ class ItemSerializer(serializers.ModelSerializer):
             "tax",
         ]
 
-    def get_tax(self, obj) -> Decimal:
+    async def get_tax(self, obj) -> Decimal:
         return obj.tax
 
-    def get_category(self, obj) -> str | None:
+    async def get_category(self, obj) -> str | None:
         if obj.category_id is None:
             return None
         return obj.category.slug
 
-    def get_image(self, obj) -> str:
+    async def get_image(self, obj) -> str:
         if obj.image_url:
             return obj.image_url
         if obj.image:

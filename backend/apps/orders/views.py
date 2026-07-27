@@ -4,7 +4,7 @@ from asgiref.sync import sync_to_async
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from apps.orders.models import Category, Item, Order, OrderItem
 from apps.orders.serializers import (
@@ -23,7 +23,7 @@ class Pagination(PageNumberPagination):
 
 
 class CategoryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (AllowAny,)
     serializer_class = CategorySerializer
     queryset = Category.objects.all()
     pagination_class = None
@@ -41,6 +41,11 @@ class ItemsViewSet(
     pagination_class = Pagination
     queryset = Item.objects.select_related("category").all()
     lookup_field = "id"
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve", "alist", "aretrieve"):
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
 
 class OrderViewSet(

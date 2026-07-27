@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShopPage } from "@/src/components/ShopPage";
 import { useApp } from "@/src/providers/AppProvider";
-import type { ProductDetailData } from "@/src/components/ProductDetail";
+import type { CatalogProduct } from "@/src/types/catalog";
 
 export function ShopPageClient() {
   const router = useRouter();
@@ -15,7 +15,7 @@ export function ShopPageClient() {
     router.push(`/?category=${cat}`);
   };
 
-  const handleProductClick = (product: ProductDetailData) => {
+  const handleProductClick = (product: CatalogProduct) => {
     setSelectedProduct(product);
     router.push(`/product/${product.id}`);
     window.scrollTo({ top: 0, behavior: "smooth" });

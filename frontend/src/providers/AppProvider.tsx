@@ -1,7 +1,7 @@
 "use client";
 
 import {createContext, type ReactNode, useCallback, useContext, useEffect, useState,} from "react";
-import type {ProductDetailData} from "@/src/components/ProductDetail";
+import type {CatalogProduct} from "@/src/types/catalog";
 import {
     clearTokens,
     fetchCurrentUser,
@@ -22,7 +22,7 @@ interface AppContextValue {
     // Cart
     cart: CartItem[];
     cartCount: number;
-    addToCart: (product: ProductDetailData, qty?: number) => void;
+    addToCart: (product: CatalogProduct, qty?: number) => void;
     removeFromCart: (id: number) => void;
     clearCart: () => void;
 
@@ -57,8 +57,8 @@ interface AppContextValue {
     closeLogin: () => void;
 
     // Selected product (for /product/[id] route)
-    selectedProduct: ProductDetailData | null;
-    setSelectedProduct: (p: ProductDetailData | null) => void;
+    selectedProduct: CatalogProduct | null;
+    setSelectedProduct: (p: CatalogProduct | null) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -70,7 +70,7 @@ export function AppProvider({children}: { children: ReactNode }) {
     const [authLoading, setAuthLoading] = useState(true);
     const [showLogin, setShowLogin] = useState(false);
     const [selectedProduct, setSelectedProduct] =
-        useState<ProductDetailData | null>(null);
+        useState<CatalogProduct | null>(null);
 
     const cartCount = cart.reduce((s, i) => s + i.qty, 0);
     const isLoggedIn = user !== null;
@@ -98,7 +98,7 @@ export function AppProvider({children}: { children: ReactNode }) {
         };
     }, []);
 
-    const addToCart = (product: ProductDetailData, qty = 1) => {
+    const addToCart = (product: CatalogProduct, qty = 1) => {
         setCart((prev) => {
             const existing = prev.find((i) => i.id === product.id);
             if (existing)
