@@ -21,6 +21,11 @@ PAYMENT_METHOD_TYPES = {
     Order.PaymentMethod.INVOICE: ["customer_balance"],
 }
 
+ASYNC_PAYMENT_METHODS = {
+    Order.PaymentMethod.BANK,
+    Order.PaymentMethod.INVOICE,
+}
+
 
 def money(value: Decimal) -> Decimal:
     return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -82,6 +87,16 @@ def _metadata_value(metadata, key: str, default=None):
     return default if value is None else value
 
 
+def _payment_intent_id(payment_intent) -> str:
+    if isinstance(payment_intent, str):
+        return payment_intent
+    if not payment_intent:
+        return ""
+    return getattr(payment_intent, "id", "") or str(
+        _session_get(payment_intent, "id", "") or ""
+    )
+
+
 class OrderService:
     @staticmethod
     @transaction.atomic
@@ -100,6 +115,18 @@ class OrderService:
             .first()
         )
         if existing:
+            updates = []
+            if (
+                payment_status == Order.PaymentStatus.PAID
+                and existing.payment_status != Order.PaymentStatus.PAID
+            ):
+                existing.payment_status = Order.PaymentStatus.PAID
+                updates.append("payment_status")
+            if stripe_payment_intent_id and not existing.stripe_payment_intent_id:
+                existing.stripe_payment_intent_id = stripe_payment_intent_id
+                updates.append("stripe_payment_intent_id")
+            if updates:
+                existing.save(update_fields=updates)
             return existing
 
         raw_items = payload["items"]
@@ -221,7 +248,6 @@ class OrderService:
 
         session_kwargs = {
             "mode": "payment",
-            "customer_email": payload["email"],
             "line_items": line_items,
             "success_url": success_url,
             "cancel_url": cancel_url,
@@ -238,20 +264,50 @@ class OrderService:
             },
         }
 
-        if payment_method in (
-            Order.PaymentMethod.BANK,
-            Order.PaymentMethod.INVOICE,
-        ):
+        if payment_method in ASYNC_PAYMENT_METHODS:
+            shipping = payload.get("shipping") or {}
+            customer_name = " ".join(
+                part
+                for part in (
+                    shipping.get("first_name", ""),
+                    shipping.get("last_name", ""),
+                )
+                if part
+            ).strip() or None
+            stripe_customer = stripe.Customer.create(
+                email=payload["email"],
+                name=customer_name,
+                phone=payload.get("phone") or None,
+                metadata={
+                    "draft_id": str(draft.id),
+                    "shop_user_id": str(getattr(customer, "id", "") or ""),
+                },
+            )
+            session_kwargs["customer"] = stripe_customer.id
             session_kwargs["payment_method_options"] = {
                 "customer_balance": {
                     "funding_type": "bank_transfer",
-                    "bank_transfer": {"type": "eu_bank_transfer", "eu_bank_transfer": {"country": "DE"}},
+                    "bank_transfer": {
+                        "type": "eu_bank_transfer",
+                        "eu_bank_transfer": {"country": "DE"},
+                    },
                 }
             }
+        else:
+            session_kwargs["customer_email"] = payload["email"]
 
         session = stripe.checkout.Session.create(**session_kwargs)
         draft.stripe_session_id = session.id
         draft.save(update_fields=["stripe_session_id"])
+
+        # Überweisung/Rechnung: Bestellung sofort als pending speichern.
+        if payment_method in ASYNC_PAYMENT_METHODS:
+            OrderService.create_order_from_payload(
+                payload=draft.payload,
+                stripe_session_id=session.id,
+                customer=customer,
+                payment_status=Order.PaymentStatus.PENDING,
+            )
 
         return {
             "session_id": session.id,
@@ -264,13 +320,30 @@ class OrderService:
     def fulfill_stripe_session(session: dict | stripe.checkout.Session) -> Order | None:
         session_id = _session_get(session, "id")
         payment_status = _session_get(session, "payment_status")
+        session_status = _session_get(session, "status")
         metadata = _session_get(session, "metadata") or {}
         payment_intent = _session_get(session, "payment_intent")
+        payment_method = _metadata_value(metadata, "payment_method")
+        intent_id = _payment_intent_id(payment_intent)
 
-        if payment_status not in ("paid", "no_payment_required"):
-            # Bank transfer may be unpaid initially; still create order as pending.
-            if payment_status != "unpaid":
-                return None
+        is_paid = payment_status in ("paid", "no_payment_required")
+        is_async_pending = payment_status == "unpaid" and (
+            payment_method in ASYNC_PAYMENT_METHODS or session_status == "complete"
+        )
+
+        existing = Order.objects.filter(stripe_session_id=session_id).first()
+        if existing:
+            if is_paid:
+                return OrderService.create_order_from_payload(
+                    payload={},
+                    stripe_session_id=session_id,
+                    stripe_payment_intent_id=intent_id,
+                    payment_status=Order.PaymentStatus.PAID,
+                )
+            return existing
+
+        if not is_paid and not is_async_pending:
+            return None
 
         draft_id = _metadata_value(metadata, "draft_id")
         if not draft_id:
@@ -278,8 +351,7 @@ class OrderService:
 
         draft = CheckoutDraft.objects.filter(pk=draft_id).first()
         if not draft:
-            existing = Order.objects.filter(stripe_session_id=session_id).first()
-            return existing
+            return None
 
         customer = None
         customer_id = draft.payload.get("customer_id")
@@ -289,32 +361,27 @@ class OrderService:
             User = get_user_model()
             customer = User.objects.filter(pk=customer_id).first()
 
-        status = (
-            Order.PaymentStatus.PAID
-            if payment_status in ("paid", "no_payment_required")
-            else Order.PaymentStatus.PENDING
-        )
-        intent_id = ""
-        if isinstance(payment_intent, str):
-            intent_id = payment_intent
-        elif payment_intent:
-            intent_id = getattr(payment_intent, "id", "") or str(
-                _session_get(payment_intent, "id", "") or ""
-            )
-
-        order = OrderService.create_order_from_payload(
+        return OrderService.create_order_from_payload(
             payload=draft.payload,
             stripe_session_id=session_id,
             stripe_payment_intent_id=intent_id,
             customer=customer,
-            payment_status=status,
+            payment_status=(
+                Order.PaymentStatus.PAID if is_paid else Order.PaymentStatus.PENDING
+            ),
         )
-        return order
 
     @staticmethod
     def confirm_session(session_id: str) -> Order:
+        existing = Order.objects.filter(stripe_session_id=session_id).first()
         session = stripe.checkout.Session.retrieve(session_id)
         order = OrderService.fulfill_stripe_session(session)
         if order is None:
+            if existing is not None:
+                return existing
             raise ValueError("Zahlung noch nicht abgeschlossen.")
-        return order
+        return (
+            Order.objects.select_related("customer")
+            .prefetch_related("items__item")
+            .get(pk=order.pk)
+        )
