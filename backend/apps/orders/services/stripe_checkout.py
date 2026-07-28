@@ -60,6 +60,28 @@ def resolve_cart_items(raw_items: list[dict]) -> list[dict]:
     return resolved
 
 
+def _session_get(session: dict | stripe.checkout.Session, key: str, default=None):
+    if isinstance(session, dict):
+        return session.get(key, default)
+    try:
+        value = session[key]
+    except KeyError:
+        return default
+    return default if value is None else value
+
+
+def _metadata_value(metadata, key: str, default=None):
+    if not metadata:
+        return default
+    if isinstance(metadata, dict):
+        return metadata.get(key, default)
+    try:
+        value = metadata[key]
+    except KeyError:
+        return default
+    return default if value is None else value
+
+
 class OrderService:
     @staticmethod
     @transaction.atomic
@@ -240,29 +262,17 @@ class OrderService:
 
     @staticmethod
     def fulfill_stripe_session(session: dict | stripe.checkout.Session) -> Order | None:
-        session_id = session["id"] if isinstance(session, dict) else session.id
-        payment_status = (
-            session["payment_status"]
-            if isinstance(session, dict)
-            else session.payment_status
-        )
-        metadata = (
-            session.get("metadata") or {}
-            if isinstance(session, dict)
-            else (session.metadata or {})
-        )
-        payment_intent = (
-            session.get("payment_intent")
-            if isinstance(session, dict)
-            else session.payment_intent
-        )
+        session_id = _session_get(session, "id")
+        payment_status = _session_get(session, "payment_status")
+        metadata = _session_get(session, "metadata") or {}
+        payment_intent = _session_get(session, "payment_intent")
 
         if payment_status not in ("paid", "no_payment_required"):
             # Bank transfer may be unpaid initially; still create order as pending.
             if payment_status != "unpaid":
                 return None
 
-        draft_id = metadata.get("draft_id")
+        draft_id = _metadata_value(metadata, "draft_id")
         if not draft_id:
             return None
 
@@ -288,7 +298,9 @@ class OrderService:
         if isinstance(payment_intent, str):
             intent_id = payment_intent
         elif payment_intent:
-            intent_id = getattr(payment_intent, "id", "") or ""
+            intent_id = getattr(payment_intent, "id", "") or str(
+                _session_get(payment_intent, "id", "") or ""
+            )
 
         order = OrderService.create_order_from_payload(
             payload=draft.payload,
