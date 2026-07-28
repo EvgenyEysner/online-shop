@@ -69,6 +69,18 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
             country=self.country,
         )
 
+    def as_checkout_shipping(self) -> dict:
+        """Shipping payload for Stripe checkout (guest/logged-in)."""
+        return {
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "street": self.street,
+            "street_no": self.street_no,
+            "zip": self.zip_code,
+            "city": self.city,
+            "country": self.country,
+        }
+
     def __str__(self):
         return self.email
 

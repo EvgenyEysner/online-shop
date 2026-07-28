@@ -207,6 +207,11 @@ MEDIA_ROOT = BASE_DIR / env("DJANGO_MEDIA_ROOT", default="media")
 
 API_DOCS_ENABLED: bool = env.bool("API_DOCS_ENABLED", default=True)
 
+FRONTEND_URL: str = env("FRONTEND_URL", default="http://localhost:3000")
+STRIPE_SECRET_KEY: str = env("STRIPE_SECRET_KEY", default="")
+STRIPE_PUBLIC_KEY: str = env("STRIPE_PUBLIC_KEY", default="")
+STRIPE_WEBHOOK_SECRET: str = env("STRIPE_WEBHOOK_SECRET", default="")
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",

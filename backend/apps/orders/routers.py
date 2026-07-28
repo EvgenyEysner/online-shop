@@ -1,17 +1,19 @@
 from adrf.routers import DefaultRouter
 
 from .views import (
-    CartViewSet,
     CategoryViewSet,
+    CheckoutViewSet,
     ItemsViewSet,
     OrderItemViewSet,
     OrderViewSet,
+    StripeWebhookViewSet,
 )
 
 router = DefaultRouter()
 
-router.register("categories", CategoryViewSet, "categories")
-router.register("items", ItemsViewSet, "items")
-router.register("orders", OrderViewSet, "orders")
-router.register("order-items", OrderItemViewSet, "order-items")
-router.register("cart", CartViewSet, "cart")
+router.register("categories", CategoryViewSet, basename="categories")
+router.register("items", ItemsViewSet, basename="items")
+router.register("orders", OrderViewSet, basename="orders")
+router.register("order-items", OrderItemViewSet, basename="order-items")
+router.register("checkout", CheckoutViewSet, basename="checkout")
+router.register("stripe", StripeWebhookViewSet, basename="stripe")

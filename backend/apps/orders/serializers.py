@@ -7,6 +7,7 @@ from rest_framework.relations import PrimaryKeyRelatedField, SlugRelatedField
 
 from apps.orders.models import Category, Item, Order, OrderItem
 from apps.orders.services import OrderService
+from apps.orders.services.stripe_checkout import calculate_totals, resolve_cart_items
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -65,20 +66,75 @@ class ItemSerializer(serializers.ModelSerializer):
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    item = SlugRelatedField(slug_field="name", read_only=True)
+    item = SlugRelatedField(slug_field="name", read_only=True, allow_null=True)
+    line_total = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
 
     class Meta:
         model = OrderItem
-        fields = "__all__"
+        fields = [
+            "id",
+            "item",
+            "item_name",
+            "unit_price",
+            "quantity",
+            "line_total",
+        ]
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    items = OrderItemSerializer(many=True)
-    customer = SlugRelatedField(slug_field="last_name", read_only=True)
+    items = OrderItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = Order
-        fields = "__all__"
+        fields = [
+            "id",
+            "order_number",
+            "email",
+            "phone",
+            "note",
+            "shipping_salutation",
+            "shipping_first_name",
+            "shipping_last_name",
+            "shipping_company",
+            "shipping_street",
+            "shipping_street_no",
+            "shipping_zip",
+            "shipping_city",
+            "shipping_country",
+            "billing_same_as_shipping",
+            "billing_salutation",
+            "billing_first_name",
+            "billing_last_name",
+            "billing_company",
+            "billing_street",
+            "billing_street_no",
+            "billing_zip",
+            "billing_city",
+            "billing_country",
+            "payment_method",
+            "payment_status",
+            "stripe_session_id",
+            "subtotal",
+            "tax_amount",
+            "shipping_cost",
+            "total",
+            "items",
+            "created_at",
+        ]
+
+
+class AddressSerializer(serializers.Serializer):
+    salutation = serializers.CharField(required=False, allow_blank=True, max_length=16)
+    first_name = serializers.CharField(max_length=64)
+    last_name = serializers.CharField(max_length=64)
+    company = serializers.CharField(required=False, allow_blank=True, max_length=128)
+    street = serializers.CharField(max_length=255)
+    street_no = serializers.CharField(required=False, allow_blank=True, max_length=32)
+    zip = serializers.CharField(max_length=16)
+    city = serializers.CharField(max_length=128)
+    country = serializers.CharField(required=False, allow_blank=True, max_length=64)
 
 
 class CartItemWriteSerializer(serializers.Serializer):
@@ -86,21 +142,54 @@ class CartItemWriteSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1)
 
 
-class CartSerializer(serializers.Serializer):
+class CheckoutSessionSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    phone = serializers.CharField(required=False, allow_blank=True, max_length=64)
     note = serializers.CharField(
         required=False, allow_blank=True, allow_null=True, max_length=256
     )
+    payment_method = serializers.ChoiceField(choices=Order.PaymentMethod.choices)
     items = CartItemWriteSerializer(many=True)
+    shipping = AddressSerializer()
+    billing = AddressSerializer(required=False)
+    billing_same_as_shipping = serializers.BooleanField(default=True)
 
     def validate_items(self, value):
         if not value:
             raise ValidationError("Warenkorb darf nicht leer sein.")
         return value
 
-    async def acreate(self, validated_data):
+    def validate(self, attrs):
+        if not attrs.get("billing_same_as_shipping") and not attrs.get("billing"):
+            raise ValidationError(
+                {"billing": "Rechnungsadresse ist erforderlich."}
+            )
+        return attrs
+
+    def create_session(self):
         request = self.context["request"]
-        return await sync_to_async(OrderService.create_order)(
-            request.user,
-            validated_data.get("note"),
-            validated_data["items"],
+        data = self.validated_data
+        user = request.user if request.user.is_authenticated else None
+        frontend = self.context["frontend_url"].rstrip("/")
+
+        payload = {
+            "email": data["email"],
+            "phone": data.get("phone", ""),
+            "note": data.get("note") or "",
+            "payment_method": data["payment_method"],
+            "items": data["items"],
+            "shipping": data["shipping"],
+            "billing": data.get("billing") or data["shipping"],
+            "billing_same_as_shipping": data.get("billing_same_as_shipping", True),
+        }
+
+        # Validate totals can be computed
+        resolve_cart_items(payload["items"])
+        calculate_totals(resolve_cart_items(payload["items"]))
+
+        return OrderService.create_checkout_session(
+            payload=payload,
+            customer=user,
+            success_url=f"{frontend}/checkout?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{frontend}/checkout?cancelled=1",
         )

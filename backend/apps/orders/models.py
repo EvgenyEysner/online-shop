@@ -63,9 +63,7 @@ class Item(models.Model):
         default=UnitChoices.PIECES,
         verbose_name="Maßeinheit",
     )
-    power_label = models.CharField(
-        "Leistung / Kennwert", max_length=64, blank=True
-    )
+    power_label = models.CharField("Leistung / Kennwert", max_length=64, blank=True)
     badge = models.CharField("Badge", max_length=64, blank=True)
     rating = models.DecimalField(
         "Bewertung", max_digits=2, decimal_places=1, default=Decimal("0.0")
@@ -92,12 +90,98 @@ class Item(models.Model):
         ordering = ("name",)
 
 
-class Order(models.Model):
-    customer = models.ForeignKey(
-        User, on_delete=models.PROTECT, verbose_name=User._meta.verbose_name
-    )
+class CheckoutDraft(models.Model):
+    """Temporary cart + address payload until Stripe payment succeeds."""
 
+    id = models.UUIDField(primary_key=True, editable=False)
+    payload = models.JSONField()
+    stripe_session_id = models.CharField(max_length=255, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Checkout-Entwurf"
+        verbose_name_plural = "Checkout-Entwürfe"
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return str(self.id)
+
+
+class Order(models.Model):
+    class PaymentStatus(models.TextChoices):
+        PENDING = "pending", "Ausstehend"
+        PAID = "paid", "Bezahlt"
+        FAILED = "failed", "Fehlgeschlagen"
+        CANCELLED = "cancelled", "Storniert"
+
+    class PaymentMethod(models.TextChoices):
+        CARD = "card", "Kreditkarte"
+        PAYPAL = "paypal", "PayPal"
+        BANK = "bank", "Überweisung"
+        INVOICE = "invoice", "Rechnung"
+
+    order_number = models.CharField(
+        "Bestellnummer", max_length=32, unique=True, blank=True
+    )
+    customer = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        verbose_name=User._meta.verbose_name,
+        null=True,
+        blank=True,
+        related_name="orders",
+    )
+    email = models.EmailField("E-Mail")
+    phone = models.CharField("Telefon", max_length=64, blank=True)
     note = models.TextField(max_length=256, verbose_name="Notiz", blank=True, null=True)
+
+    # Shipping
+    shipping_salutation = models.CharField(max_length=16, blank=True)
+    shipping_first_name = models.CharField(max_length=64)
+    shipping_last_name = models.CharField(max_length=64)
+    shipping_company = models.CharField(max_length=128, blank=True)
+    shipping_street = models.CharField(max_length=255)
+    shipping_street_no = models.CharField(max_length=32, blank=True)
+    shipping_zip = models.CharField(max_length=16)
+    shipping_city = models.CharField(max_length=128)
+    shipping_country = models.CharField(max_length=64, default="Deutschland")
+
+    # Billing
+    billing_same_as_shipping = models.BooleanField(default=True)
+    billing_salutation = models.CharField(max_length=16, blank=True)
+    billing_first_name = models.CharField(max_length=64, blank=True)
+    billing_last_name = models.CharField(max_length=64, blank=True)
+    billing_company = models.CharField(max_length=128, blank=True)
+    billing_street = models.CharField(max_length=255, blank=True)
+    billing_street_no = models.CharField(max_length=32, blank=True)
+    billing_zip = models.CharField(max_length=16, blank=True)
+    billing_city = models.CharField(max_length=128, blank=True)
+    billing_country = models.CharField(max_length=64, blank=True)
+
+    payment_method = models.CharField(
+        max_length=16, choices=PaymentMethod.choices, default=PaymentMethod.CARD
+    )
+    payment_status = models.CharField(
+        max_length=16,
+        choices=PaymentStatus.choices,
+        default=PaymentStatus.PENDING,
+        db_index=True,
+    )
+    stripe_session_id = models.CharField(
+        max_length=255, blank=True, unique=True, null=True
+    )
+    stripe_payment_intent_id = models.CharField(max_length=255, blank=True)
+
+    subtotal = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0")
+    )
+    tax_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0")
+    )
+    shipping_cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0")
+    )
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
 
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -111,12 +195,12 @@ class Order(models.Model):
     class Meta:
         verbose_name = "Bestellung"
         verbose_name_plural = "Bestellungen"
-        ordering = ("created_at",)
+        ordering = ("-created_at",)
 
     def __str__(self):
-        return f"{self.customer} {self.created_at}"
+        return self.order_number
 
-    def get_total(self):
+    def get_total_quantity(self):
         return sum(item.quantity for item in self.items.all())
 
 
@@ -127,14 +211,22 @@ class OrderItem(models.Model):
     item = models.ForeignKey(
         Item,
         verbose_name="Artikel",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="order_items",
+        null=True,
+        blank=True,
     )
-    quantity = models.PositiveSmallIntegerField(verbose_name="Menge", default=0)
+    item_name = models.CharField(max_length=128)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity = models.PositiveSmallIntegerField(verbose_name="Menge", default=1)
 
     class Meta:
-        verbose_name = "Artikel"
-        verbose_name_plural = "Artikeln"
+        verbose_name = "Bestellposition"
+        verbose_name_plural = "Bestellpositionen"
 
     def __str__(self):
-        return str(self.id)
+        return f"{self.item_name} × {self.quantity}"
+
+    @property
+    def line_total(self) -> Decimal:
+        return self.unit_price * self.quantity

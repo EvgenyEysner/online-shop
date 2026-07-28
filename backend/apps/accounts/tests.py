@@ -45,7 +45,7 @@ class RegisterViewTests(TestCase):
 
     def test_sign_up_assigns_customer_number_and_tokens(self):
         response = self.client.post(
-            "/api/v1/sign-up/",
+            "/api/v1/accounts/sign-up/",
             {
                 "email": "new@example.com",
                 "first_name": "Max",
@@ -67,7 +67,7 @@ class RegisterViewTests(TestCase):
 
     def test_sign_up_rejects_password_mismatch(self):
         response = self.client.post(
-            "/api/v1/sign-up/",
+            "/api/v1/accounts/sign-up/",
             {
                 "email": "mismatch@example.com",
                 "first_name": "Max",
@@ -82,7 +82,7 @@ class RegisterViewTests(TestCase):
 
     def test_sign_up_rejects_password_without_digit(self):
         response = self.client.post(
-            "/api/v1/sign-up/",
+            "/api/v1/accounts/sign-up/",
             {
                 "email": "weak@example.com",
                 "first_name": "Max",
@@ -98,7 +98,7 @@ class RegisterViewTests(TestCase):
 
     def test_sign_up_rejects_password_without_special_character(self):
         response = self.client.post(
-            "/api/v1/sign-up/",
+            "/api/v1/accounts/sign-up/",
             {
                 "email": "weak2@example.com",
                 "first_name": "Max",
@@ -114,7 +114,7 @@ class RegisterViewTests(TestCase):
 
     def test_customer_number_not_accepted_from_client(self):
         response = self.client.post(
-            "/api/v1/sign-up/",
+            "/api/v1/accounts/sign-up/",
             {
                 "email": "hacker@example.com",
                 "first_name": "Bad",

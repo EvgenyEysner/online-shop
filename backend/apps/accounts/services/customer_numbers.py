@@ -1,11 +1,17 @@
-from apps.accounts.global_identifier import GlobalIdentifier
+"""
+Backward-compatible re-export. Prefer apps.accounts.services.identifiers.
+"""
 
-CUSTOMER_NUMBER_KEY = "customer_number"
-CUSTOMER_NUMBER_START = 100001
-CUSTOMER_NUMBER_PREFIX = "K39"
+from .identifiers import (
+    CUSTOMER_NUMBER_KEY,
+    CUSTOMER_NUMBER_START,
+    SHOP_NUMBER_PREFIX,
+    allocate_customer_number,
+)
 
-
-def allocate_customer_number() -> str:
-    """Allocate the next customer number using GlobalIdentifier."""
-    sequence = GlobalIdentifier.next(CUSTOMER_NUMBER_KEY, default=CUSTOMER_NUMBER_START)
-    return f"{CUSTOMER_NUMBER_PREFIX}-{sequence}"
+__all__ = [
+    "CUSTOMER_NUMBER_KEY",
+    "CUSTOMER_NUMBER_START",
+    "SHOP_NUMBER_PREFIX",
+    "allocate_customer_number",
+]

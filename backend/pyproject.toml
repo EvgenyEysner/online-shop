@@ -26,4 +26,5 @@ dependencies = [
     "pillow>=12.1.0",
     "psycopg2-binary>=2.9.11",
     "requests>=2.34.2",
+    "stripe>=15.3.1",
 ]
