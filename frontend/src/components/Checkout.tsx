@@ -1,10 +1,16 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft, CheckCircle, CreditCard, Building2, Smartphone,
   ChevronRight, MapPin, User, Phone, Mail, Package, Shield,
-  Truck, FileText, Download, Home
+  Truck, FileText, Download, Home, Loader2
 } from "lucide-react";
+import {
+  confirmCheckoutSession,
+  createCheckoutSession,
+  type ConfirmedOrder,
+  type PaymentMethod,
+} from "@/src/lib/checkout";
 
 interface CartItem {
   id: number;
@@ -17,9 +23,9 @@ interface CheckoutProps {
   cart: CartItem[];
   onBack: () => void;
   onFinish: () => void;
+  onConfirmed?: () => void;
+  initialSessionId?: string | null;
 }
-
-type PaymentMethod = "bank" | "invoice" | "card" | "paypal";
 
 const PAYMENT_METHODS: Array<{ key: PaymentMethod; label: string; desc: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = [
   { key: "bank", label: "Überweisung", desc: "Zahlung per Banküberweisung (2–3 Werktage)", icon: Building2 },
@@ -46,16 +52,16 @@ interface AddressForm {
 
 const INITIAL_ADDRESS: AddressForm = {
   salutation: "Herr",
-  firstName: "Max",
-  lastName: "Mustermann",
+  firstName: "",
+  lastName: "",
   company: "",
-  street: "Musterstraße",
-  streetNo: "12",
-  zip: "39104",
-  city: "Magdeburg",
+  street: "",
+  streetNo: "",
+  zip: "",
+  city: "",
   country: "Deutschland",
-  phone: "+49 391 123 456",
-  email: "max@mustermann.de",
+  phone: "",
+  email: "",
   notes: "",
   sameAsBilling: true,
 };
@@ -98,21 +104,100 @@ function StepIndicator({ current }: { current: string }) {
   );
 }
 
-export function Checkout({ cart, onBack, onFinish }: CheckoutProps) {
-  const [step, setStep] = useState<"cart" | "address" | "payment" | "confirm">("cart");
+export function Checkout({ cart, onBack, onFinish, onConfirmed, initialSessionId = null }: CheckoutProps) {
+  const [step, setStep] = useState<"cart" | "address" | "payment" | "confirm">(
+    initialSessionId ? "confirm" : "cart"
+  );
   const [address, setAddress] = useState<AddressForm>(INITIAL_ADDRESS);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("bank");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
   const [agreeTerms, setAgreeTerms] = useState(false);
-  const [orderNumber] = useState(`K39-2025-${String(Math.floor(Math.random() * 900) + 100).padStart(4, "0")}`);
+  const [submitting, setSubmitting] = useState(false);
+  const [confirmLoading, setConfirmLoading] = useState(Boolean(initialSessionId));
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrder | null>(null);
 
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const shipping = subtotal >= 500 ? 0 : 4.90;
-  const tax = (subtotal + shipping) * 0.19;
-  const total = subtotal + shipping + tax;
   const totalGross = subtotal * 1.19 + shipping;
 
   const updateAddress = (field: keyof AddressForm, value: string | boolean) => {
     setAddress(prev => ({ ...prev, [field]: value }));
+  };
+
+  useEffect(() => {
+    if (!initialSessionId) return;
+    let cancelled = false;
+
+    async function loadConfirmation() {
+      setConfirmLoading(true);
+      setCheckoutError(null);
+      try {
+        const order = await confirmCheckoutSession(initialSessionId!);
+        if (!cancelled) {
+          setConfirmedOrder(order);
+          setStep("confirm");
+          onConfirmed?.();
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setCheckoutError(
+            err instanceof Error ? err.message : "Bestellung konnte nicht bestätigt werden."
+          );
+        }
+      } finally {
+        if (!cancelled) setConfirmLoading(false);
+      }
+    }
+
+    loadConfirmation();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialSessionId, onConfirmed]);
+
+  const handlePay = async () => {
+    if (!agreeTerms || submitting) return;
+    if (!address.email || !address.firstName || !address.lastName || !address.street || !address.zip || !address.city) {
+      setCheckoutError("Bitte Adresse und E-Mail vollständig ausfüllen.");
+      setStep("address");
+      return;
+    }
+    if (cart.length === 0) {
+      setCheckoutError("Warenkorb ist leer.");
+      return;
+    }
+
+    setSubmitting(true);
+    setCheckoutError(null);
+    try {
+      const shippingAddress = {
+        salutation: address.salutation,
+        first_name: address.firstName,
+        last_name: address.lastName,
+        company: address.company,
+        street: address.street,
+        street_no: address.streetNo,
+        zip: address.zip,
+        city: address.city,
+        country: address.country,
+      };
+      const session = await createCheckoutSession({
+        email: address.email,
+        phone: address.phone,
+        note: address.notes,
+        payment_method: paymentMethod,
+        items: cart.map((item) => ({ item: item.id, quantity: item.qty })),
+        shipping: shippingAddress,
+        billing: shippingAddress,
+        billing_same_as_shipping: address.sameAsBilling,
+      });
+      window.location.href = session.url;
+    } catch (err) {
+      setCheckoutError(
+        err instanceof Error ? err.message : "Zahlung konnte nicht gestartet werden."
+      );
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -388,23 +473,10 @@ export function Checkout({ cart, onBack, onFinish }: CheckoutProps) {
                   </div>
                 )}
 
-                {/* Card form */}
-                {paymentMethod === "card" && (
-                  <div className="p-4 bg-muted/50 border border-border rounded-xl mb-6 space-y-3">
-                    <div>
-                      <label className="text-foreground text-xs font-semibold block mb-1">Kartennummer</label>
-                      <input placeholder="0000 0000 0000 0000" className="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-foreground text-xs font-semibold block mb-1">Gültig bis</label>
-                        <input placeholder="MM/JJ" className="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
-                      </div>
-                      <div>
-                        <label className="text-foreground text-xs font-semibold block mb-1">CVC</label>
-                        <input placeholder="123" className="w-full px-3 py-2 bg-card border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
-                      </div>
-                    </div>
+                {(paymentMethod === "card" || paymentMethod === "paypal") && (
+                  <div className="p-4 bg-muted/50 border border-border rounded-xl mb-6 text-sm text-muted-foreground">
+                    Nach dem Bestätigen werden Sie sicher zu Stripe weitergeleitet, um mit{" "}
+                    {paymentMethod === "paypal" ? "PayPal" : "Kreditkarte"} zu bezahlen.
                   </div>
                 )}
 
@@ -421,25 +493,32 @@ export function Checkout({ cart, onBack, onFinish }: CheckoutProps) {
                   </span>
                 </label>
 
+                {checkoutError && step === "payment" && (
+                  <div className="mb-4 p-3 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-xs">
+                    {checkoutError}
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   <button
                     onClick={() => setStep("address")}
-                    className="px-5 py-2.5 border border-border text-foreground rounded-xl text-sm hover:bg-muted transition-colors"
+                    disabled={submitting}
+                    className="px-5 py-2.5 border border-border text-foreground rounded-xl text-sm hover:bg-muted transition-colors disabled:opacity-60"
                   >
                     Zurück
                   </button>
                   <button
-                    disabled={!agreeTerms}
-                    onClick={() => setStep("confirm")}
+                    disabled={!agreeTerms || submitting}
+                    onClick={handlePay}
                     className={`flex-1 py-2.5 font-bold rounded-xl flex items-center justify-center gap-2 transition-all ${
-                      agreeTerms
+                      agreeTerms && !submitting
                         ? "bg-accent text-primary hover:bg-accent/90"
                         : "bg-muted text-muted-foreground cursor-not-allowed"
                     }`}
                     style={{ fontFamily: "var(--font-display)" }}
                   >
-                    <Shield size={16} />
-                    Jetzt kostenpflichtig bestellen
+                    {submitting ? <Loader2 size={16} className="animate-spin" /> : <Shield size={16} />}
+                    {submitting ? "Weiterleitung zu Stripe…" : "Jetzt kostenpflichtig bestellen"}
                   </button>
                 </div>
               </div>
@@ -448,6 +527,21 @@ export function Checkout({ cart, onBack, onFinish }: CheckoutProps) {
             {/* STEP: Confirmation */}
             {step === "confirm" && (
               <div className="text-center">
+                {confirmLoading && (
+                  <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground text-sm">
+                    <Loader2 size={18} className="animate-spin" />
+                    Bestellung wird bestätigt…
+                  </div>
+                )}
+
+                {!confirmLoading && checkoutError && !confirmedOrder && (
+                  <div className="p-4 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-sm mb-6">
+                    {checkoutError}
+                  </div>
+                )}
+
+                {!confirmLoading && confirmedOrder && (
+                  <>
                 <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
                   <CheckCircle size={40} className="text-green-500" />
                 </div>
@@ -455,48 +549,45 @@ export function Checkout({ cart, onBack, onFinish }: CheckoutProps) {
                   Vielen Dank für Ihre Bestellung!
                 </h2>
                 <p className="text-muted-foreground mb-1">
-                  Ihre Bestellnummer: <span className="text-foreground font-mono font-bold">{orderNumber}</span>
+                  Ihre Bestellnummer: <span className="text-foreground font-mono font-bold">{confirmedOrder.order_number}</span>
                 </p>
                 <p className="text-muted-foreground text-sm mb-8">
-                  Eine Bestätigungs-E-Mail wurde an <strong>{address.email}</strong> gesendet.
+                  Eine Bestätigungs-E-Mail wurde an <strong>{confirmedOrder.email}</strong> gesendet.
                 </p>
 
-                {/* Order summary */}
                 <div className="bg-card border border-border rounded-xl p-5 text-left mb-6">
                   <h3 className="text-foreground mb-3" style={{ fontFamily: "var(--font-display)", fontWeight: 700 }}>Bestellübersicht</h3>
-                  {cart.map((item) => (
+                  {confirmedOrder.items.map((item) => (
                     <div key={item.id} className="flex justify-between py-2 border-b border-border last:border-0">
-                      <span className="text-foreground text-sm">{item.name} × {item.qty}</span>
-                      <span className="text-foreground text-sm font-semibold">{(item.price * item.qty * 1.19).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
+                      <span className="text-foreground text-sm">{item.item_name} × {item.quantity}</span>
+                      <span className="text-foreground text-sm font-semibold">{(Number(item.unit_price) * item.quantity * 1.19).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</span>
                     </div>
                   ))}
                   <div className="flex justify-between pt-3 mt-1">
                     <span className="text-foreground font-bold" style={{ fontFamily: "var(--font-display)" }}>Gesamt</span>
                     <span className="text-foreground font-bold" style={{ fontFamily: "var(--font-display)", fontSize: "1.1rem" }}>
-                      {totalGross.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                      {Number(confirmedOrder.total).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
                     </span>
                   </div>
                 </div>
 
-                {/* Delivery address */}
                 <div className="bg-card border border-border rounded-xl p-5 text-left mb-6">
                   <div className="flex items-center gap-2 mb-3">
                     <MapPin size={16} className="text-accent" />
                     <h3 className="text-foreground" style={{ fontFamily: "var(--font-display)", fontWeight: 700 }}>Lieferadresse</h3>
                   </div>
-                  <p className="text-foreground text-sm">{address.salutation} {address.firstName} {address.lastName}</p>
-                  {address.company && <p className="text-foreground text-sm">{address.company}</p>}
-                  <p className="text-muted-foreground text-sm">{address.street} {address.streetNo}, {address.zip} {address.city}</p>
-                  <p className="text-muted-foreground text-sm">{address.country}</p>
+                  <p className="text-foreground text-sm">{confirmedOrder.shipping_salutation} {confirmedOrder.shipping_first_name} {confirmedOrder.shipping_last_name}</p>
+                  {confirmedOrder.shipping_company && <p className="text-foreground text-sm">{confirmedOrder.shipping_company}</p>}
+                  <p className="text-muted-foreground text-sm">{confirmedOrder.shipping_street} {confirmedOrder.shipping_street_no}, {confirmedOrder.shipping_zip} {confirmedOrder.shipping_city}</p>
+                  <p className="text-muted-foreground text-sm">{confirmedOrder.shipping_country}</p>
                 </div>
 
-                {/* Payment */}
                 <div className="bg-card border border-border rounded-xl p-5 text-left mb-8">
                   <div className="flex items-center gap-2 mb-2">
                     <CreditCard size={16} className="text-accent" />
                     <h3 className="text-foreground" style={{ fontFamily: "var(--font-display)", fontWeight: 700 }}>Zahlungsart</h3>
                   </div>
-                  <p className="text-foreground text-sm">{PAYMENT_METHODS.find(m => m.key === paymentMethod)?.label}</p>
+                  <p className="text-foreground text-sm">{PAYMENT_METHODS.find(m => m.key === confirmedOrder.payment_method)?.label}</p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -534,6 +625,8 @@ export function Checkout({ cart, onBack, onFinish }: CheckoutProps) {
                     })}
                   </div>
                 </div>
+                  </>
+                )}
               </div>
             )}
           </div>
