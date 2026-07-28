@@ -1,6 +1,6 @@
 from django.contrib.auth.base_user import BaseUserManager
 
-from .services.customer_numbers import allocate_customer_number
+from apps.core.services.allocation import NumberAllocationService
 
 
 class UserManager(BaseUserManager):
@@ -16,7 +16,9 @@ class UserManager(BaseUserManager):
 
         email = self.normalize_email(email)
         if not extra_fields.get("customer_number"):
-            extra_fields["customer_number"] = allocate_customer_number()
+            extra_fields["customer_number"] = (
+                NumberAllocationService.allocate_customer_number()
+            )
         user = self.model(email=email, **extra_fields)
 
         if password:

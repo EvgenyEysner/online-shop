@@ -4,9 +4,10 @@ from apps.accounts.services.customer_numbers import (
 )
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from apps.accounts.global_identifier import GlobalIdentifier
 from rest_framework import status
 from rest_framework.test import APIClient
+
+from core.services.allocation import GlobalIdentifier
 
 User = get_user_model()
 

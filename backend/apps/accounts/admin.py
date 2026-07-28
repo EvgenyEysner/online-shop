@@ -1,6 +1,6 @@
-from apps.accounts.global_identifier import GlobalIdentifier
 from django.contrib import admin
 
+from apps.core.services.allocation import GlobalIdentifier
 from .models import CustomUser
 
 

@@ -5,7 +5,7 @@ import stripe
 from django.conf import settings
 from django.db import transaction
 
-from apps.accounts.services.identifiers import allocate_order_number
+from apps.core.services.allocation import NumberAllocationService
 from apps.orders.models import CheckoutDraft, Item, Order, OrderItem
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -42,9 +42,7 @@ def calculate_totals(cart_items: list[dict]) -> dict[str, Decimal]:
         qty = Decimal(entry["quantity"])
         subtotal += money(item.price * qty)
 
-    shipping = (
-        Decimal("0.00") if subtotal >= FREE_SHIPPING_THRESHOLD else SHIPPING_COST
-    )
+    shipping = Decimal("0.00") if subtotal >= FREE_SHIPPING_THRESHOLD else SHIPPING_COST
     tax_amount = money(subtotal * TAX_RATE)
     total = money(subtotal + tax_amount + shipping)
     return {
@@ -137,7 +135,7 @@ class OrderService:
         same_as_shipping = bool(payload.get("billing_same_as_shipping", True))
 
         order = Order.objects.create(
-            order_number=allocate_order_number(),
+            order_number=NumberAllocationService.allocate_order_number(),
             customer=customer,
             email=payload["email"],
             phone=payload.get("phone", ""),
@@ -266,14 +264,17 @@ class OrderService:
 
         if payment_method in ASYNC_PAYMENT_METHODS:
             shipping = payload.get("shipping") or {}
-            customer_name = " ".join(
-                part
-                for part in (
-                    shipping.get("first_name", ""),
-                    shipping.get("last_name", ""),
-                )
-                if part
-            ).strip() or None
+            customer_name = (
+                " ".join(
+                    part
+                    for part in (
+                        shipping.get("first_name", ""),
+                        shipping.get("last_name", ""),
+                    )
+                    if part
+                ).strip()
+                or None
+            )
             stripe_customer = stripe.Customer.create(
                 email=payload["email"],
                 name=customer_name,

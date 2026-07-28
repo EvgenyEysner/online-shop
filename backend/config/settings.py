@@ -37,7 +37,7 @@ THIRD_PARTY_APPS: Tuple[str, ...] = (
     "drf_spectacular",
 )
 
-LOCAL_APPS: Tuple[str, ...] = ("apps.accounts", "apps.orders")
+LOCAL_APPS: Tuple[str, ...] = ("apps.accounts", "apps.orders", "apps.core")
 INSTALLED_APPS = THIRD_PARTY_APPS + DJANGO_APPS + LOCAL_APPS
 
 AUTH_USER_MODEL = "accounts.CustomUser"
@@ -265,5 +265,11 @@ SIMPLE_JWT = {
     "JTI_CLAIM": "jti",
     "SIGNING_KEY": SECRET_KEY,
 }
+# --- Shop Config ----------------------------------- #
+SHOP_NUMBER_PREFIX = env("SHOP_NUMBER_PREFIX")
+CUSTOMER_NUMBER_KEY = env("CUSTOMER_NUMBER_KEY")
+CUSTOMER_NUMBER_START = env.int("CUSTOMER_NUMBER_START", default=100001)
 
+ORDER_NUMBER_KEY = env("ORDER_NUMBER_KEY")
+ORDER_NUMBER_START = env.int("ORDER_NUMBER_START", default=1000)
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
