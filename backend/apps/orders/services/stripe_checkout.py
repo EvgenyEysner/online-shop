@@ -85,15 +85,15 @@ class StripeCheckoutService:
     def _create_stripe_customer(self, *, payload: dict, draft_id) -> str:
         shipping = payload.get("shipping") or {}
         customer_name = (
-                " ".join(
-                    part
-                    for part in (
-                        shipping.get("first_name", ""),
-                        shipping.get("last_name", ""),
-                    )
-                    if part
-                ).strip()
-                or None
+            " ".join(
+                part
+                for part in (
+                    shipping.get("first_name", ""),
+                    shipping.get("last_name", ""),
+                )
+                if part
+            ).strip()
+            or None
         )
         stripe_customer = stripe.Customer.create(
             email=payload["email"],
@@ -107,14 +107,14 @@ class StripeCheckoutService:
         return stripe_customer.id
 
     def create_session(
-            self,
-            *,
-            cart_items: list[dict],
-            totals: dict,
-            payload: dict,
-            draft_id,
-            success_url: str,
-            cancel_url: str,
+        self,
+        *,
+        cart_items: list[dict],
+        totals: dict,
+        payload: dict,
+        draft_id,
+        success_url: str,
+        cancel_url: str,
     ) -> stripe.checkout.Session:
         payment_method = payload.get("payment_method", Order.PaymentMethod.CARD)
 
