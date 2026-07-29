@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -25,3 +26,14 @@ class Address:
             "city": self.city,
             "country": self.country,
         }
+
+
+def stripe_get(obj, key: str, default=None) -> Any:
+    """
+    Liest ein Feld aus einer Stripe-Session, Metadata oder einem Dict.
+    """
+    if obj is None:
+        return default
+    getter = getattr(obj, "get", None)
+    value = getter(key, default) if getter else getattr(obj, key, default)
+    return default if value is None else value

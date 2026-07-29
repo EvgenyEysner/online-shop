@@ -1,13 +1,13 @@
 from decimal import Decimal
+from typing import Any
 
 from adrf import serializers
-from asgiref.sync import sync_to_async
 from rest_framework.exceptions import ValidationError
 from rest_framework.relations import PrimaryKeyRelatedField, SlugRelatedField
 
 from apps.orders.models import Category, Item, Order, OrderItem
 from apps.orders.services import OrderService
-from apps.orders.services.stripe_checkout import calculate_totals, resolve_cart_items
+from apps.orders.services.pricing import PricingService
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -161,9 +161,7 @@ class CheckoutSessionSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if not attrs.get("billing_same_as_shipping") and not attrs.get("billing"):
-            raise ValidationError(
-                {"billing": "Rechnungsadresse ist erforderlich."}
-            )
+            raise ValidationError({"billing": "Rechnungsadresse ist erforderlich."})
         return attrs
 
     def create_session(self):
@@ -172,7 +170,7 @@ class CheckoutSessionSerializer(serializers.Serializer):
         user = request.user if request.user.is_authenticated else None
         frontend = self.context["frontend_url"].rstrip("/")
 
-        payload = {
+        payload: dict[str, Any] = {
             "email": data["email"],
             "phone": data.get("phone", ""),
             "note": data.get("note") or "",
@@ -184,8 +182,9 @@ class CheckoutSessionSerializer(serializers.Serializer):
         }
 
         # Validate totals can be computed
-        resolve_cart_items(payload["items"])
-        calculate_totals(resolve_cart_items(payload["items"]))
+        PricingService.calculate_totals(
+            PricingService.resolve_cart_items(payload["items"])
+        )
 
         return OrderService.create_checkout_session(
             payload=payload,

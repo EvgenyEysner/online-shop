@@ -1,5 +1,6 @@
 import os
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import List, Tuple
 
@@ -272,4 +273,9 @@ CUSTOMER_NUMBER_START = env.int("CUSTOMER_NUMBER_START", default=100001)
 
 ORDER_NUMBER_KEY = env("ORDER_NUMBER_KEY")
 ORDER_NUMBER_START = env.int("ORDER_NUMBER_START", default=1000)
+
+TAX_RATE = Decimal(env.int("TAX_RATE"))
+FREE_SHIPPING_THRESHOLD = Decimal(env.int("FREE_SHIPPING_THRESHOLD"))
+SHIPPING_COST = Decimal(env.int("SHIPPING_COST"))
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
