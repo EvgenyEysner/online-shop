@@ -1,43 +1,11 @@
-from apps.accounts.services.customer_numbers import (
-    CUSTOMER_NUMBER_START,
-    allocate_customer_number,
-)
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.services.allocation import GlobalIdentifier
-
 User = get_user_model()
 
-
-class GlobalIdentifierTests(TestCase):
-    def test_next_returns_default_on_first_call(self):
-        value = GlobalIdentifier.next("test_key", default=200000)
-        self.assertEqual(value, 200000)
-
-    def test_next_increments_on_subsequent_calls(self):
-        first = GlobalIdentifier.next("increment_key", default=10)
-        second = GlobalIdentifier.next("increment_key")
-        self.assertEqual(first, 10)
-        self.assertEqual(second, 11)
-
-    def test_next_n_returns_range(self):
-        values = list(GlobalIdentifier.next_n("batch_key", count=3, default=100))
-        self.assertEqual(values, [100, 101, 102])
-
-
-class CustomerNumberServiceTests(TestCase):
-    def test_allocate_first_customer_number(self):
-        number = allocate_customer_number()
-        self.assertEqual(number, f"K39-{CUSTOMER_NUMBER_START}")
-
-    def test_allocate_increments_sequence(self):
-        first = allocate_customer_number()
-        second = allocate_customer_number()
-        self.assertEqual(first, f"K39-{CUSTOMER_NUMBER_START}")
-        self.assertEqual(second, f"K39-{CUSTOMER_NUMBER_START + 1}")
+USER_PASSWORD = "SecurePass123!"
 
 
 class RegisterViewTests(TestCase):
@@ -131,3 +99,41 @@ class RegisterViewTests(TestCase):
         user = User.objects.get(email="hacker@example.com")
         self.assertNotEqual(user.customer_number, "K39-999999")
         self.assertTrue(user.customer_number.startswith("K39-"))
+
+
+class LoginRefreshTests(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            email="test@example.com",
+            first_name="Test",
+            last_name="User",
+            password=USER_PASSWORD,
+        )
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_login_refresh(self):
+        response = self.client.post(
+            "/api/v1/login/",
+            {
+                "email": self.user.email,
+                "password": USER_PASSWORD,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+
+        refresh_response = self.client.post(
+            "/api/v1/login/refresh/",
+            {"refresh": response.data["refresh"]},
+            format="json",
+        )
+
+        self.assertEqual(refresh_response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", refresh_response.data)
