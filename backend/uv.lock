@@ -706,6 +706,18 @@ wheels = [
 ]
 
 [[package]]
+name = "model-bakery"
+version = "1.24.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f9/49/3e5b51d7af52bf39e348767c1feb16c97d18654a8e3f3306eb4b899e98cf/model_bakery-1.24.0.tar.gz", hash = "sha256:6469223c9fb0eccb021d5c33667b914e9208dd2282d7dc1e55394c2310a7687d", size = 28372, upload-time = "2026-06-23T21:55:23.19Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/60/8e/9108507501846c9ee2a1b277d35d1f92ae251852bbd1527f6dbf2665d94a/model_bakery-1.24.0-py3-none-any.whl", hash = "sha256:d1f739cfc43e8d403d04734a18c73c8e677f655dd08719e35342c2f5ada1d7e9", size = 30819, upload-time = "2026-06-23T21:55:21.911Z" },
+]
+
+[[package]]
 name = "msgpack"
 version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -918,6 +930,7 @@ dependencies = [
     { name = "flower" },
     { name = "gunicorn" },
     { name = "markdown" },
+    { name = "model-bakery" },
     { name = "pillow" },
     { name = "psycopg2-binary" },
     { name = "requests" },
@@ -944,6 +957,7 @@ requires-dist = [
     { name = "flower", specifier = ">=2.0.1" },
     { name = "gunicorn", specifier = ">=25.0.1" },
     { name = "markdown", specifier = ">=3.10.1" },
+    { name = "model-bakery", specifier = ">=1.24.0" },
     { name = "pillow", specifier = ">=12.1.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.11" },
     { name = "requests", specifier = ">=2.34.2" },

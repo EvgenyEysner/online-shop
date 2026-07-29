@@ -23,6 +23,7 @@ dependencies = [
     "flower>=2.0.1",
     "gunicorn>=25.0.1",
     "markdown>=3.10.1",
+    "model-bakery>=1.24.0",
     "pillow>=12.1.0",
     "psycopg2-binary>=2.9.11",
     "requests>=2.34.2",
