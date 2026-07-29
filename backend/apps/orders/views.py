@@ -10,6 +10,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import AnonRateThrottle
 
+from apps.orders.exceptions import InsufficientStockError
 from apps.orders.models import Category, Item, Order, OrderItem
 from apps.orders.serializers import (
     CategorySerializer,
@@ -19,6 +20,7 @@ from apps.orders.serializers import (
     OrderSerializer,
 )
 from apps.orders.services.order import OrderService
+from apps.orders.services.order_creation import OrderCreationService
 
 
 class Pagination(PageNumberPagination):
@@ -48,7 +50,7 @@ class ItemsViewSet(
     parser_classes = (MultiPartParser, FormParser)
     serializer_class = ItemSerializer
     pagination_class = Pagination
-    queryset = Item.objects.select_related("category").all()
+    queryset = Item.objects.select_related("category").filter(on_stock__gt=0)
     lookup_field = "id"
 
 
@@ -100,6 +102,8 @@ class CheckoutViewSet(viewsets.GenericViewSet):
         await sync_to_async(serializer.is_valid)(raise_exception=True)
         try:
             result = await sync_to_async(serializer.create_session)()
+        except InsufficientStockError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except stripe.error.StripeError as exc:
             return Response(
                 {"detail": str(exc.user_message or exc)},
@@ -151,19 +155,22 @@ class StripeWebhookViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         if event["type"] in (
-            "checkout.session.completed",
-            "checkout.session.async_payment_succeeded",
+                "checkout.session.completed",
+                "checkout.session.async_payment_succeeded",
         ):
             session = event["data"]["object"]
             await sync_to_async(OrderService.fulfill_stripe_session)(session)
         elif event["type"] == "checkout.session.async_payment_failed":
             session = event["data"]["object"]
 
-            def mark_failed():
-                Order.objects.filter(stripe_session_id=session["id"]).update(
-                    payment_status=Order.PaymentStatus.FAILED
-                )
+            def mark_failed_and_restock():
+                order = Order.objects.filter(stripe_session_id=session["id"]).first()
+                if order is None or order.payment_status == Order.PaymentStatus.FAILED:
+                    return
+                OrderCreationService.restock_order(order)
+                order.payment_status = Order.PaymentStatus.FAILED
+                order.save(update_fields=["payment_status"])
 
-            await sync_to_async(mark_failed)()
+            await sync_to_async(mark_failed_and_restock)()
 
         return Response({"received": True})

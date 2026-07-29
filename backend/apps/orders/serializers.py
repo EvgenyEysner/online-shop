@@ -5,6 +5,7 @@ from adrf import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.relations import PrimaryKeyRelatedField, SlugRelatedField
 
+from apps.orders.exceptions import InsufficientStockError
 from apps.orders.models import Category, Item, Order, OrderItem
 from apps.orders.services.order import OrderService
 from apps.orders.services.pricing import PricingService
@@ -181,7 +182,7 @@ class CheckoutSessionSerializer(serializers.Serializer):
             raise ValidationError(
                 {"items": "Ein oder mehrere Artikel sind nicht mehr verfügbar."}
             )
-        except ValueError as exc:
+        except InsufficientStockError as exc:
             raise ValidationError({"items": str(exc)})
 
         return attrs
