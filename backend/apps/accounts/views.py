@@ -4,6 +4,7 @@ from asgiref.sync import sync_to_async
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import RegisterSerializer, UserSerializer
@@ -12,6 +13,7 @@ from .serializers import RegisterSerializer, UserSerializer
 class RegisterViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle]
 
     async def acreate(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

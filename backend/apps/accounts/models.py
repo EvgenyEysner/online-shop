@@ -18,9 +18,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         blank=True,
         null=True,
     )
-    email = models.EmailField(unique=True)  # unique
-    first_name = models.CharField(max_length=30)
-    last_name = models.CharField(max_length=30)
+    email = models.EmailField("E-Mail-Adresse", unique=True)
+    first_name = models.CharField("Vorname", max_length=150)
+    last_name = models.CharField("Nachname", max_length=150)
 
     street = models.CharField("Straße", max_length=255)
     street_no = models.CharField("Hausnummer", max_length=255, blank=True)
@@ -55,13 +55,25 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         verbose_name = "Benutzer"
         verbose_name_plural = "Benutzer"
 
+    def __str__(self) -> str:
+        return self.email
+
+    def save(self, *args, **kwargs):
+        self.email = self.__class__.objects.normalize_email(self.email)
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        self.email = self.__class__.objects.normalize_email(self.email)
+
     @property
-    def full_name(self):
+    def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
 
     def address(self) -> Address:
         return Address(
-            recipient=self.full_name,
+            first_name=self.first_name,
+            last_name=self.last_name,
             street=self.street,
             street_no=self.street_no,
             zip_code=self.zip_code,
@@ -70,20 +82,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         )
 
     def as_checkout_shipping(self) -> dict:
-        """Shipping payload for Stripe checkout (guest/logged-in)."""
-        return {
-            "first_name": self.first_name,
-            "last_name": self.last_name,
-            "street": self.street,
-            "street_no": self.street_no,
-            "zip": self.zip_code,
-            "city": self.city,
-            "country": self.country,
-        }
-
-    def __str__(self):
-        return self.email
-
-    def clean(self):
-        super().clean()
-        self.email = self.__class__.objects.normalize_email(self.email)
+        """
+        Shipping payload for Stripe checkout (guest/logged-in).
+        """
+        return self.address().as_checkout_shipping()

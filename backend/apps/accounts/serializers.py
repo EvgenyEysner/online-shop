@@ -39,6 +39,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             validate_password(attrs["password"])
         except DjangoValidationError as exc:
             raise ValidationError({"password": exc.messages}) from exc
+
         return attrs
 
     async def acreate(self, validated_data):
@@ -63,6 +64,7 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "customer_number",
+            "email",
             "is_active",
             "is_staff",
             "full_name",

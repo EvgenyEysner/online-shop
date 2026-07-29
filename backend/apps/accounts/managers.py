@@ -4,7 +4,9 @@ from apps.core.services.allocation import NumberAllocationService
 
 
 class UserManager(BaseUserManager):
-    """Custom user manager using email as the unique identifier."""
+    """
+    Custom user manager using email as the unique identifier.
+    """
 
     def create_user(self, email, password=None, **extra_fields):
         """
@@ -15,7 +17,9 @@ class UserManager(BaseUserManager):
             raise ValueError("Email is required.")
 
         email = self.normalize_email(email)
-        if not extra_fields.get("customer_number"):
+        if not extra_fields.get("customer_number") and not extra_fields.get(
+                "is_superuser"
+        ):
             extra_fields["customer_number"] = (
                 NumberAllocationService.allocate_customer_number()
             )

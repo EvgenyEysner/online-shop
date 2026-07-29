@@ -1,17 +1,27 @@
-from dataclasses import dataclass, fields, MISSING
+from dataclasses import dataclass
 
 
-@dataclass(
-    order=True,
-)
+@dataclass
 class Address:
-    recipient: str
-    zip_code: str
-    city: str
+    first_name: str
+    last_name: str
     street: str
     street_no: str
+    zip_code: str
+    city: str
     country: str
 
-    @classmethod
-    def required_fields(cls):
-        return [f.name for f in fields(cls) if f.default == MISSING]
+    @property
+    def recipient(self) -> str:
+        return f"{self.first_name} {self.last_name}"
+
+    def as_checkout_shipping(self) -> dict:
+        return {
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "street": self.street,
+            "street_no": self.street_no,
+            "zip": self.zip_code,
+            "city": self.city,
+            "country": self.country,
+        }
