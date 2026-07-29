@@ -18,7 +18,7 @@ class UserManager(BaseUserManager):
 
         email = self.normalize_email(email)
         if not extra_fields.get("customer_number") and not extra_fields.get(
-                "is_superuser"
+            "is_superuser"
         ):
             extra_fields["customer_number"] = (
                 NumberAllocationService.allocate_customer_number()
