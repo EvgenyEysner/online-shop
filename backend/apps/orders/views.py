@@ -155,8 +155,8 @@ class StripeWebhookViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         if event["type"] in (
-                "checkout.session.completed",
-                "checkout.session.async_payment_succeeded",
+            "checkout.session.completed",
+            "checkout.session.async_payment_succeeded",
         ):
             session = event["data"]["object"]
             await sync_to_async(OrderService.fulfill_stripe_session)(session)

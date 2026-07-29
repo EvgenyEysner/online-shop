@@ -17,12 +17,12 @@ class OrderCreationService:
     @staticmethod
     @transaction.atomic
     def create_from_payload(
-            *,
-            payload: dict,
-            stripe_session_id: str,
-            stripe_payment_intent_id: str = "",
-            customer=None,
-            payment_status: str = Order.PaymentStatus.PAID,
+        *,
+        payload: dict,
+        stripe_session_id: str,
+        stripe_payment_intent_id: str = "",
+        customer=None,
+        payment_status: str = Order.PaymentStatus.PAID,
     ) -> Order:
         existing = OrderCreationService._get_existing(stripe_session_id)
         if existing:
@@ -179,12 +179,12 @@ class OrderCreationService:
 
     @staticmethod
     def _update_existing(
-            order: Order, *, payment_status: str, stripe_payment_intent_id: str
+        order: Order, *, payment_status: str, stripe_payment_intent_id: str
     ) -> Order:
         updates = []
         if (
-                payment_status == Order.PaymentStatus.PAID
-                and order.payment_status != Order.PaymentStatus.PAID
+            payment_status == Order.PaymentStatus.PAID
+            and order.payment_status != Order.PaymentStatus.PAID
         ):
             order.payment_status = Order.PaymentStatus.PAID
             updates.append("payment_status")

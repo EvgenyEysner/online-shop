@@ -21,7 +21,7 @@ class OrderService:
 
     @staticmethod
     def create_checkout_session(
-            *, payload: dict, customer=None, success_url: str, cancel_url: str
+        *, payload: dict, customer=None, success_url: str, cancel_url: str
     ) -> dict:
         cart_items = PricingService.resolve_cart_items(payload["items"])
         totals = PricingService.calculate_totals(cart_items)
@@ -79,12 +79,12 @@ class OrderService:
 
     @staticmethod
     def _create_order_or_refund(
-            *,
-            payload: dict,
-            stripe_session_id: str,
-            stripe_payment_intent_id: str,
-            payment_status: str,
-            customer=None,
+        *,
+        payload: dict,
+        stripe_session_id: str,
+        stripe_payment_intent_id: str,
+        payment_status: str,
+        customer=None,
     ) -> Order | None:
         """
         Wrapper um OrderCreationService.create_from_payload für den
@@ -127,8 +127,8 @@ class OrderService:
 
         is_paid = payment_status in ("paid", "no_payment_required")
         is_async_pending = payment_status == "unpaid" and (
-                payment_method in checkout.ASYNC_PAYMENT_METHODS
-                or session_status == "complete"
+            payment_method in checkout.ASYNC_PAYMENT_METHODS
+            or session_status == "complete"
         )
 
         existing = Order.objects.filter(stripe_session_id=session_id).first()
