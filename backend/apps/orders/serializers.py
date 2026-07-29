@@ -115,7 +115,6 @@ class OrderSerializer(serializers.ModelSerializer):
             "billing_country",
             "payment_method",
             "payment_status",
-            "stripe_session_id",
             "subtotal",
             "tax_amount",
             "shipping_cost",
@@ -138,8 +137,19 @@ class AddressSerializer(serializers.Serializer):
 
 
 class CartItemWriteSerializer(serializers.Serializer):
-    item = PrimaryKeyRelatedField(queryset=Item.objects.all())
+    item = PrimaryKeyRelatedField(queryset=Item.objects.filter(on_stock__gt=0))
     quantity = serializers.IntegerField(min_value=1)
+
+    def validate(self, attrs):
+        item = attrs["item"]
+        quantity = attrs["quantity"]
+        if quantity > item.on_stock:
+            raise ValidationError(
+                {
+                    "quantity": f"Nur noch {item.on_stock} Stück von '{item.name}' verfügbar."
+                }
+            )
+        return attrs
 
 
 class CheckoutSessionSerializer(serializers.Serializer):
@@ -162,6 +172,18 @@ class CheckoutSessionSerializer(serializers.Serializer):
     def validate(self, attrs):
         if not attrs.get("billing_same_as_shipping") and not attrs.get("billing"):
             raise ValidationError({"billing": "Rechnungsadresse ist erforderlich."})
+
+        try:
+            PricingService.calculate_totals(
+                PricingService.resolve_cart_items(attrs["items"])
+            )
+        except Item.DoesNotExist:
+            raise ValidationError(
+                {"items": "Ein oder mehrere Artikel sind nicht mehr verfügbar."}
+            )
+        except ValueError as exc:
+            raise ValidationError({"items": str(exc)})
+
         return attrs
 
     def create_session(self):
@@ -180,11 +202,6 @@ class CheckoutSessionSerializer(serializers.Serializer):
             "billing": data.get("billing") or data["shipping"],
             "billing_same_as_shipping": data.get("billing_same_as_shipping", True),
         }
-
-        # Validate totals can be computed
-        PricingService.calculate_totals(
-            PricingService.resolve_cart_items(payload["items"])
-        )
 
         return OrderService.create_checkout_session(
             payload=payload,

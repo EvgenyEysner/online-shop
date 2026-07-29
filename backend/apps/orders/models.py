@@ -167,9 +167,7 @@ class Order(models.Model):
         default=PaymentStatus.PENDING,
         db_index=True,
     )
-    stripe_session_id = models.CharField(
-        max_length=255, blank=True, unique=True, null=True
-    )
+    stripe_session_id = models.CharField(max_length=255, unique=True, db_index=True)
     stripe_payment_intent_id = models.CharField(max_length=255, blank=True)
 
     subtotal = models.DecimalField(

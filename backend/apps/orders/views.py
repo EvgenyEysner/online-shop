@@ -8,6 +8,7 @@ from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import AnonRateThrottle
 
 from apps.orders.models import Category, Item, Order, OrderItem
 from apps.orders.serializers import (
@@ -36,20 +37,19 @@ class CategoryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 class ItemsViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
-    mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
-    permission_classes = (IsAuthenticated,)
+    """
+    Nur Lesezugriff über die API. Artikel werden ausschließlich über den
+    Django Admin (als Superuser) angelegt, bearbeitet oder gelöscht.
+    """
+
+    permission_classes = (AllowAny,)
     parser_classes = (MultiPartParser, FormParser)
     serializer_class = ItemSerializer
     pagination_class = Pagination
     queryset = Item.objects.select_related("category").all()
     lookup_field = "id"
-
-    def get_permissions(self):
-        if self.action in ("list", "retrieve", "alist", "aretrieve"):
-            return [AllowAny()]
-        return [IsAuthenticated()]
 
 
 class OrderViewSet(
@@ -76,13 +76,18 @@ class OrderItemViewSet(
 ):
     permission_classes = (IsAuthenticated,)
     pagination_class = Pagination
-    queryset = OrderItem.objects.select_related("order", "item").all()
     serializer_class = OrderItemSerializer
+
+    def get_queryset(self):
+        return OrderItem.objects.select_related("order", "item").filter(
+            order__customer=self.request.user
+        )
 
 
 class CheckoutViewSet(viewsets.GenericViewSet):
     permission_classes = (AllowAny,)
     serializer_class = CheckoutSessionSerializer
+    throttle_classes = [AnonRateThrottle]
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

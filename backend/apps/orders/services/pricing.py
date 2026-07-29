@@ -19,6 +19,7 @@ class PricingService:
         """
         Löst Item-Referenzen (PK oder Instanz) zu Item-Objekten auf.
         Holt alle fehlenden Items in einer einzigen Query.
+        Prüft, dass die angefragte Menge den Lagerbestand nicht übersteigt.
         """
         missing_ids = [
             entry["item"] for entry in raw_items if not isinstance(entry["item"], Item)
@@ -28,12 +29,20 @@ class PricingService:
         resolved = []
         for entry in raw_items:
             item = entry["item"]
+            quantity = int(entry["quantity"])
+
             if not isinstance(item, Item):
                 try:
                     item = items_by_id[item]
                 except KeyError:
                     raise Item.DoesNotExist(f"Item {item!r} nicht gefunden.") from None
-            resolved.append({"item": item, "quantity": int(entry["quantity"])})
+
+            if quantity > item.on_stock:
+                raise ValueError(
+                    f"Nur noch {item.on_stock} Stück von '{item.name}' verfügbar."
+                )
+
+            resolved.append({"item": item, "quantity": quantity})
         return resolved
 
     @classmethod

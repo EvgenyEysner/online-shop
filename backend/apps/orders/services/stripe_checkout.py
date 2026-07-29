@@ -5,7 +5,7 @@ import stripe
 from django.conf import settings
 
 from apps.orders.models import Order
-from utils.helpers import stripe_get
+from apps.utils.helpers import stripe_get
 from .pricing import PricingService
 
 
