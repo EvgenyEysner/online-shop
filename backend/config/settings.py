@@ -233,6 +233,8 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.ScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
+        "anon": "60/hour",  # AnonRateThrottle (sign-up, checkout, …)
+        "user": "1000/day",
         "contact": "5/hour",  # Spam protection for contact form submissions
     },
 }
