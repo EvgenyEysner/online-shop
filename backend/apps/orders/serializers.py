@@ -6,7 +6,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.relations import PrimaryKeyRelatedField, SlugRelatedField
 
 from apps.orders.models import Category, Item, Order, OrderItem
-from apps.orders.services import OrderService
+from apps.orders.services.order import OrderService
 from apps.orders.services.pricing import PricingService
 
 

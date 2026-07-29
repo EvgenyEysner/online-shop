@@ -1,3 +1,4 @@
+import stripe
 from adrf import mixins, viewsets
 from adrf.mixins import Response, get_data
 from asgiref.sync import sync_to_async
@@ -7,7 +8,6 @@ from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
-import stripe
 
 from apps.orders.models import Category, Item, Order, OrderItem
 from apps.orders.serializers import (
@@ -17,7 +17,7 @@ from apps.orders.serializers import (
     OrderItemSerializer,
     OrderSerializer,
 )
-from apps.orders.services import OrderService
+from apps.orders.services.order import OrderService
 
 
 class Pagination(PageNumberPagination):
@@ -146,8 +146,8 @@ class StripeWebhookViewSet(viewsets.GenericViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         if event["type"] in (
-            "checkout.session.completed",
-            "checkout.session.async_payment_succeeded",
+                "checkout.session.completed",
+                "checkout.session.async_payment_succeeded",
         ):
             session = event["data"]["object"]
             await sync_to_async(OrderService.fulfill_stripe_session)(session)
