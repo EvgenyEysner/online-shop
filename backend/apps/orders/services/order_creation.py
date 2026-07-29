@@ -3,7 +3,7 @@ from django.db.models import F
 
 from apps.orders.exceptions import InsufficientStockError
 from apps.orders.models import Item, Order, OrderItem
-from core.services.allocation import NumberAllocationService
+from apps.core.services.allocation import NumberAllocationService
 from .pricing import PricingService
 
 
