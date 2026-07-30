@@ -221,6 +221,7 @@ class OrderItem(models.Model):
     class Meta:
         verbose_name = "Bestellposition"
         verbose_name_plural = "Bestellpositionen"
+        ordering = ("order_id",)
 
     def __str__(self):
         return f"{self.item_name} × {self.quantity}"
