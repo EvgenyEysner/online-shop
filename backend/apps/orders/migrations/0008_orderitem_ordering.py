@@ -4,14 +4,17 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('orders', '0007_alter_order_stripe_session_id'),
+        ("orders", "0007_alter_order_stripe_session_id"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='orderitem',
-            options={'ordering': ('id',), 'verbose_name': 'Bestellposition', 'verbose_name_plural': 'Bestellpositionen'},
+            name="orderitem",
+            options={
+                "ordering": ("id",),
+                "verbose_name": "Bestellposition",
+                "verbose_name_plural": "Bestellpositionen",
+            },
         ),
     ]

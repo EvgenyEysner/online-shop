@@ -7,7 +7,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ("orders", "0005_alter_category_slug"),
@@ -17,7 +16,10 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="CheckoutDraft",
             fields=[
-                ("id", models.UUIDField(editable=False, primary_key=True, serialize=False)),
+                (
+                    "id",
+                    models.UUIDField(editable=False, primary_key=True, serialize=False),
+                ),
                 ("payload", models.JSONField()),
                 (
                     "stripe_session_id",
@@ -99,13 +101,17 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="order",
             name="email",
-            field=models.EmailField(default="guest@example.com", max_length=254, verbose_name="E-Mail"),
+            field=models.EmailField(
+                default="guest@example.com", max_length=254, verbose_name="E-Mail"
+            ),
             preserve_default=False,
         ),
         migrations.AddField(
             model_name="order",
             name="order_number",
-            field=models.CharField(blank=True, max_length=32, unique=True, verbose_name="Bestellnummer"),
+            field=models.CharField(
+                blank=True, max_length=32, unique=True, verbose_name="Bestellnummer"
+            ),
         ),
         migrations.AddField(
             model_name="order",
@@ -194,7 +200,9 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="order",
             name="shipping_cost",
-            field=models.DecimalField(decimal_places=2, default=Decimal("0"), max_digits=12),
+            field=models.DecimalField(
+                decimal_places=2, default=Decimal("0"), max_digits=12
+            ),
         ),
         migrations.AddField(
             model_name="order",
@@ -209,17 +217,23 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="order",
             name="subtotal",
-            field=models.DecimalField(decimal_places=2, default=Decimal("0"), max_digits=12),
+            field=models.DecimalField(
+                decimal_places=2, default=Decimal("0"), max_digits=12
+            ),
         ),
         migrations.AddField(
             model_name="order",
             name="tax_amount",
-            field=models.DecimalField(decimal_places=2, default=Decimal("0"), max_digits=12),
+            field=models.DecimalField(
+                decimal_places=2, default=Decimal("0"), max_digits=12
+            ),
         ),
         migrations.AddField(
             model_name="order",
             name="total",
-            field=models.DecimalField(decimal_places=2, default=Decimal("0"), max_digits=12),
+            field=models.DecimalField(
+                decimal_places=2, default=Decimal("0"), max_digits=12
+            ),
         ),
         migrations.AddField(
             model_name="orderitem",
@@ -230,7 +244,9 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="orderitem",
             name="unit_price",
-            field=models.DecimalField(decimal_places=2, default=Decimal("0"), max_digits=10),
+            field=models.DecimalField(
+                decimal_places=2, default=Decimal("0"), max_digits=10
+            ),
             preserve_default=False,
         ),
         migrations.AlterField(

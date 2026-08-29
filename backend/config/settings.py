@@ -30,6 +30,7 @@ DJANGO_APPS: Tuple[str, ...] = (
 )
 
 THIRD_PARTY_APPS: Tuple[str, ...] = (
+    "unfold",  # muss vor django.contrib.admin laden
     "rest_framework",
     "daphne",
     "rest_framework.authtoken",
@@ -239,7 +240,7 @@ REST_FRAMEWORK = {
     },
 }
 
-SPECTECULAR_SETTINGS = {
+SPECTACULAR_SETTINGS = {
     "TITLE": "König39 Shop API",
     "DESCRIPTION": "König39 Shop API Documentation",
     "VERSION": "0.0.0",
@@ -279,5 +280,53 @@ ORDER_NUMBER_START = env.int("ORDER_NUMBER_START", default=1000)
 TAX_RATE = Decimal(env("TAX_RATE"))
 FREE_SHIPPING_THRESHOLD = Decimal(env("FREE_SHIPPING_THRESHOLD"))
 SHIPPING_COST = Decimal(env("SHIPPING_COST"))
+CURRENCY: str = env(
+    "CURRENCY", default="eur"
+)  # ISO-4217-Kleinbuchstaben-Code, siehe Stripe-Doku
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        },
+        "simple": {
+            "format": "%(levelname)s %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple" if DEBUG else "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO" if DEBUG else "WARNING",
+            "propagate": False,
+        },
+        "apps": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
+
+# --- Produktions-Security (nur wirksam, wenn DEBUG=False) --------------- #
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = env.bool("DJANGO_SESSION_COOKIE_SECURE", default=True)
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = env.int("DJANGO_SECURE_HSTS_SECONDS", default=31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

@@ -82,7 +82,9 @@ class Item(models.Model):
 
     @property
     def tax(self) -> Decimal:
-        return self.price * Decimal("0.19")
+        from django.conf import settings
+
+        return self.price * settings.TAX_RATE
 
     class Meta:
         verbose_name = "Artikel"

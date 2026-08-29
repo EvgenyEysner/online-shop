@@ -5,74 +5,100 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('orders', '0003_remove_item_tax_alter_item_price'),
+        ("orders", "0003_remove_item_tax_alter_item_price"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='category',
-            options={'ordering': ('name',), 'verbose_name': 'Kategorie', 'verbose_name_plural': 'Kategorien'},
+            name="category",
+            options={
+                "ordering": ("name",),
+                "verbose_name": "Kategorie",
+                "verbose_name_plural": "Kategorien",
+            },
         ),
         migrations.AddField(
-            model_name='category',
-            name='image_url',
-            field=models.URLField(blank=True, verbose_name='Bild-URL'),
+            model_name="category",
+            name="image_url",
+            field=models.URLField(blank=True, verbose_name="Bild-URL"),
         ),
         migrations.AddField(
-            model_name='category',
-            name='slug',
-            field=models.SlugField(default='', max_length=64, unique=True, verbose_name='Schlüssel'),
+            model_name="category",
+            name="slug",
+            field=models.SlugField(
+                default="", max_length=64, unique=True, verbose_name="Schlüssel"
+            ),
         ),
         migrations.AddField(
-            model_name='category',
-            name='sublabel',
-            field=models.CharField(blank=True, max_length=128, verbose_name='Untertitel'),
+            model_name="category",
+            name="sublabel",
+            field=models.CharField(
+                blank=True, max_length=128, verbose_name="Untertitel"
+            ),
         ),
         migrations.AddField(
-            model_name='item',
-            name='badge',
-            field=models.CharField(blank=True, max_length=64, verbose_name='Badge'),
+            model_name="item",
+            name="badge",
+            field=models.CharField(blank=True, max_length=64, verbose_name="Badge"),
         ),
         migrations.AddField(
-            model_name='item',
-            name='image_url',
-            field=models.URLField(blank=True, verbose_name='Externe Bild-URL'),
+            model_name="item",
+            name="image_url",
+            field=models.URLField(blank=True, verbose_name="Externe Bild-URL"),
         ),
         migrations.AddField(
-            model_name='item',
-            name='original_price',
-            field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True, verbose_name='UVP / Streichpreis'),
+            model_name="item",
+            name="original_price",
+            field=models.DecimalField(
+                blank=True,
+                decimal_places=2,
+                max_digits=10,
+                null=True,
+                verbose_name="UVP / Streichpreis",
+            ),
         ),
         migrations.AddField(
-            model_name='item',
-            name='power_label',
-            field=models.CharField(blank=True, max_length=64, verbose_name='Leistung / Kennwert'),
+            model_name="item",
+            name="power_label",
+            field=models.CharField(
+                blank=True, max_length=64, verbose_name="Leistung / Kennwert"
+            ),
         ),
         migrations.AddField(
-            model_name='item',
-            name='rating',
-            field=models.DecimalField(decimal_places=1, default=Decimal('0.0'), max_digits=2, verbose_name='Bewertung'),
+            model_name="item",
+            name="rating",
+            field=models.DecimalField(
+                decimal_places=1,
+                default=Decimal("0.0"),
+                max_digits=2,
+                verbose_name="Bewertung",
+            ),
         ),
         migrations.AddField(
-            model_name='item',
-            name='reviews',
-            field=models.PositiveIntegerField(default=0, verbose_name='Anzahl Bewertungen'),
+            model_name="item",
+            name="reviews",
+            field=models.PositiveIntegerField(
+                default=0, verbose_name="Anzahl Bewertungen"
+            ),
         ),
         migrations.AddField(
-            model_name='item',
-            name='specs',
-            field=models.JSONField(blank=True, default=list, verbose_name='Technische Daten'),
+            model_name="item",
+            name="specs",
+            field=models.JSONField(
+                blank=True, default=list, verbose_name="Technische Daten"
+            ),
         ),
         migrations.AlterField(
-            model_name='item',
-            name='description',
-            field=models.TextField(blank=True, max_length=512, null=True, verbose_name='Beschreibung'),
+            model_name="item",
+            name="description",
+            field=models.TextField(
+                blank=True, max_length=512, null=True, verbose_name="Beschreibung"
+            ),
         ),
         migrations.AlterField(
-            model_name='item',
-            name='name',
-            field=models.CharField(max_length=128, verbose_name='Bezeichnung'),
+            model_name="item",
+            name="name",
+            field=models.CharField(max_length=128, verbose_name="Bezeichnung"),
         ),
     ]

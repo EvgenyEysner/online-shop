@@ -48,8 +48,7 @@ class StripeCheckoutService:
             {
                 "quantity": entry["quantity"],
                 "price_data": {
-                    # Todo make currency dynamic
-                    "currency": "eur",
+                    "currency": settings.CURRENCY,
                     "unit_amount": self.to_cents(
                         PricingService.money(
                             entry["item"].price * (Decimal("1") + settings.TAX_RATE)
@@ -66,7 +65,7 @@ class StripeCheckoutService:
                 {
                     "quantity": 1,
                     "price_data": {
-                        "currency": "eur",
+                        "currency": settings.CURRENCY,
                         "unit_amount": self.to_cents(totals["shipping_cost"]),
                         "product_data": {"name": "Versand"},
                     },
