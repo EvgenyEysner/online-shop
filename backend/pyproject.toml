@@ -35,14 +35,26 @@ dependencies = [
 dev = [
     "black>=26.5.1",
     "mypy>=2.3.1",
+    "ruff>=0.16.5",
+    "pytest>=8.3.0",
+    "pytest-django>=4.9.0",
+    "pytest-asyncio>=0.25.0",
 ]
 
+# Black only formats; all rule selection/linting lives in [tool.ruff] below - Black has no
+# "lint"/"select" concept, that section previously errored out with
+# "Invalid config keys detected: 'lint'" and "Config key target-version must be a list".
 [tool.black]
+target-version = ["py313"]
+line-length = 88
+extend-exclude = "/migrations/"   # generated files, reviewed by hand
+
+[tool.ruff]
 target-version = "py313"
 line-length = 88
 extend-exclude = ["migrations"]   # generated files, reviewed by hand
 
-[tool.black.lint]
+[tool.ruff.lint]
 select = [
     "E", "W", # pycodestyle
     "F", # pyflakes
@@ -51,34 +63,37 @@ select = [
     "UP", # pyupgrade keeps 3.13 idioms
     "B", # bugbear
     "C4", # comprehensions
-    "DTZ", # naive datetime the repo's TIMESTAMPTZ rule, enforced by the linter
-    "ASYNC", # blocking calls in async defs
+    "DTZ", # naive datetime, avoid tz-naive datetimes throughout the shop/order flow
+    "ASYNC", # blocking calls in adrf async views (see django-drf-adrf.mdc)
     "S", # bandit security rules
     "T20", # stray print()
     "SIM", "RUF",
 ]
 
-[tool.black.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106"]   # asserts and hardcoded test credentials are fine here
-# N818: the APIError subclasses are named after the HTTP status they carry, so the raise
-# site reads raise NotFound(...). An Error suffix would only repeat what the base class
-# already says. Mirrors backend/pyproject.toml verbatim.
-"exceptions/errors.py" = ["N818"]
+[tool.ruff.lint.per-file-ignores]
+# asserts and hardcoded test credentials/fixtures are fine in tests
+"apps/*/tests/**" = ["S101", "S105", "S106"]
 
+# mypy only type-checks; pydantic isn't used in this DRF project (no pydantic dependency),
+# so the "pydantic.mypy" plugin previously made every run fail with
+# "Error importing plugin pydantic.mypy: No module named 'pydantic'".
 [tool.mypy]
 python_version = "3.13"
-plugins = ["pydantic.mypy"]
 warn_unused_ignores = true
 warn_redundant_casts = true
 disallow_untyped_defs = true
 # Required, not optional: flat top-level packages with no __init__.py mean mypy would
-# otherwise map e.g. crud/x.py and schemas/x.py to the same module name and abort with
-# "Duplicate module named x" before checking anything (same trap as backend/pyproject.toml).
+# otherwise map e.g. apps/orders/tests/x.py and apps/accounts/tests/x.py to the same module
+# name and abort with "Duplicate module named x" before checking anything.
 explicit_package_bases = true
 namespace_packages = true
 
-testpaths = ["tests"]
-
+# pytest/pytest-asyncio options previously lived under [tool.mypy] by mistake (mypy warned
+# "Unrecognized option" for every one of them); pytest-django is the project's chosen test
+# runner alongside Django's own `manage.py test` (see django-drf-adrf.mdc).
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+testpaths = ["apps"]
 pythonpath = ["."]
 addopts = ["--import-mode=importlib"]
 
