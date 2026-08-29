@@ -68,6 +68,9 @@ test-reports
 *.mo
 *.pot
 
+# Docs
+docs/*
+
 # Media dir and collected statics
 #backend/media/*
 !backend/media/test-data/*
