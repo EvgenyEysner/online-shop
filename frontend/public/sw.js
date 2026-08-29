@@ -22,6 +22,16 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (request.method !== "GET") return;
 
+  // Sicherheit (ADR 0008, Finding 2): API-Antworten dürfen nie im
+  // Service-Worker-Cache landen, auch nicht same-origin - sie können
+  // nutzerspezifische, authentifizierte Daten enthalten. Explizit
+  // network-only, unabhängig davon, ob Frontend und Backend aktuell
+  // denselben Origin teilen (relevant für künftige Reverse-Proxy-Setups).
+  if (url.pathname.startsWith("/api/")) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   if (url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com") {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {

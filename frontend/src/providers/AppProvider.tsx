@@ -65,6 +65,8 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 const CART_STORAGE_KEY = "k39_cart_v1";
 
+const MAX_CART_ITEM_QTY = 999;
+
 export function isValidCartItem(value: unknown): value is CartItem {
     if (!value || typeof value !== "object") return false;
     const entry = value as Record<string, unknown>;
@@ -73,7 +75,9 @@ export function isValidCartItem(value: unknown): value is CartItem {
         typeof entry.name === "string" &&
         typeof entry.price === "number" &&
         typeof entry.qty === "number" &&
-        entry.qty > 0
+        Number.isFinite(entry.qty) &&
+        entry.qty > 0 &&
+        entry.qty <= MAX_CART_ITEM_QTY
     );
 }
 
@@ -140,9 +144,11 @@ export function AppProvider({children}: { children: ReactNode }) {
             const existing = prev.find((i) => i.id === product.id);
             if (existing)
                 return prev.map((i) =>
-                    i.id === product.id ? {...i, qty: i.qty + qty} : i
+                    i.id === product.id
+                        ? {...i, qty: Math.min(i.qty + qty, MAX_CART_ITEM_QTY)}
+                        : i
                 );
-            return [...prev, {id: product.id, name: product.name, price: product.price, qty}];
+            return [...prev, {id: product.id, name: product.name, price: product.price, qty: Math.min(qty, MAX_CART_ITEM_QTY)}];
         });
     };
 
