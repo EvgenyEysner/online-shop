@@ -8,6 +8,7 @@ import {CartDrawer} from "@/src/components/CartDrawer";
 import {LoginModal} from "@/src/components/LoginModal";
 import {OfflineBanner} from "@/src/components/OfflineBanner";
 import {PWAInstallBanner} from "@/src/components/PWAInstallBanner";
+import {ServiceWorkerRegistration} from "@/src/components/ServiceWorkerRegistration";
 import {useApp} from "@/src/providers/AppProvider";
 
 export function RootShell({children}: { children: ReactNode }) {
@@ -36,6 +37,7 @@ export function RootShell({children}: { children: ReactNode }) {
     return (
         <div className="min-h-screen bg-background flex flex-col">
             <OfflineBanner/>
+            <ServiceWorkerRegistration/>
 
             {showNavbar && (
                 <Navbar

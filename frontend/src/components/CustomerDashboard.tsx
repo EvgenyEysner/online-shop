@@ -1,15 +1,22 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { User } from "@/src/types/user";
 import { getUserDisplayName, getUserInitials } from "@/src/types/user";
 import {
   LayoutDashboard, ShoppingBag, FileText, Zap, ChevronRight,
-  Download, CheckCircle, Clock, Truck, Package, AlertCircle,
+  Download, CheckCircle, Clock, Package, AlertCircle,
   Sun, TrendingUp, Euro, LogOut, Bell, X
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
 } from "recharts";
+import { DemoDataBadge } from "@/src/components/DemoDataBadge";
+import {
+  fetchMyOrders,
+  isActiveOrder,
+  ORDER_STATUS_LABELS,
+  type ConfirmedOrder,
+} from "@/src/lib/orders";
 
 const pvMonthlyData = [
   { month: "Jan", kwh: 120, eur: 43 },
@@ -37,63 +44,44 @@ const dailyData = [
   { time: "20:00", kw: 0.0 },
 ];
 
-const ORDERS = [
-  {
-    id: "K39-2024-0089",
-    date: "12.06.2025",
-    items: "Q CELLS 400W × 12 + Huawei Wechselrichter 5kW",
-    total: 3917.00,
-    status: "delivered",
-    steps: [
-      { label: "Bestellung eingegangen", done: true, date: "12.06.2025" },
-      { label: "Zahlung bestätigt", done: true, date: "13.06.2025" },
-      { label: "In Bearbeitung", done: true, date: "14.06.2025" },
-      { label: "Versandt", done: true, date: "15.06.2025" },
-      { label: "Geliefert", done: true, date: "17.06.2025" },
-    ],
-  },
-  {
-    id: "K39-2024-0094",
-    date: "03.06.2025",
-    items: "AlphaESS SMILE5 Batteriespeicher",
-    total: 4299.00,
-    status: "shipped",
-    steps: [
-      { label: "Bestellung eingegangen", done: true, date: "03.06.2025" },
-      { label: "Zahlung bestätigt", done: true, date: "03.06.2025" },
-      { label: "In Bearbeitung", done: true, date: "05.06.2025" },
-      { label: "Versandt", done: true, date: "10.06.2025" },
-      { label: "Geliefert", done: false, date: "" },
-    ],
-  },
-  {
-    id: "K39-2024-0101",
-    date: "15.06.2025",
-    items: "Victron MPPT 100/50 + Photovoltaik-Kabel 50m",
-    total: 393.50,
-    status: "processing",
-    steps: [
-      { label: "Bestellung eingegangen", done: true, date: "15.06.2025" },
-      { label: "Zahlung bestätigt", done: true, date: "15.06.2025" },
-      { label: "In Bearbeitung", done: false, date: "" },
-      { label: "Versandt", done: false, date: "" },
-      { label: "Geliefert", done: false, date: "" },
-    ],
-  },
-];
-
 const INVOICES = [
   { id: "RE-2025-089", orderRef: "K39-2024-0089", date: "12.06.2025", amount: 3917.00, paid: true },
   { id: "RE-2025-094", orderRef: "K39-2024-0094", date: "03.06.2025", amount: 4299.00, paid: true },
   { id: "RE-2025-101", orderRef: "K39-2024-0101", date: "15.06.2025", amount: 393.50, paid: false },
 ];
 
-const statusConfig = {
-  delivered: { label: "Geliefert", color: "text-green-600", bg: "bg-green-50 border-green-200", icon: CheckCircle },
-  shipped: { label: "Versandt", color: "text-blue-600", bg: "bg-blue-50 border-blue-200", icon: Truck },
-  processing: { label: "In Bearbeitung", color: "text-amber-600", bg: "bg-amber-50 border-amber-200", icon: Clock },
-  pending: { label: "Ausstehend", color: "text-gray-500", bg: "bg-gray-50 border-gray-200", icon: Package },
-};
+const paymentStatusConfig = {
+  paid: { color: "text-green-600", bg: "bg-green-50 border-green-200", icon: CheckCircle },
+  pending: { color: "text-amber-600", bg: "bg-amber-50 border-amber-200", icon: Clock },
+  failed: { color: "text-red-600", bg: "bg-red-50 border-red-200", icon: AlertCircle },
+  cancelled: { color: "text-gray-500", bg: "bg-gray-50 border-gray-200", icon: Package },
+} as const;
+
+function formatOrderDate(isoDate: string): string {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("de-DE");
+}
+
+interface TimelineStep {
+  label: string;
+  done: boolean;
+  date: string;
+}
+
+function buildOrderTimeline(order: ConfirmedOrder): TimelineStep[] {
+  const placed: TimelineStep = {
+    label: "Bestellung eingegangen",
+    done: true,
+    date: formatOrderDate(order.created_at),
+  };
+  const paid: TimelineStep = {
+    label: "Zahlung bestätigt",
+    done: order.payment_status === "paid",
+    date: order.payment_status === "paid" ? formatOrderDate(order.created_at) : "",
+  };
+  return [placed, paid];
+}
 
 interface CustomerDashboardProps {
   user: User;
@@ -102,8 +90,35 @@ interface CustomerDashboardProps {
 
 export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
   const [activeTab, setActiveTab] = useState("overview");
-  const [expandedOrder, setExpandedOrder] = useState<string | null>("K39-2024-0094");
+  const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [orders, setOrders] = useState<ConfirmedOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyOrders()
+      .then((data) => {
+        if (cancelled) return;
+        setOrders(data);
+        setExpandedOrder((current) => current ?? data[0]?.id ?? null);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setOrdersError(
+            err instanceof Error ? err.message : "Fehler beim Laden der Bestellungen"
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOrdersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const tabs = [
     { key: "overview", label: "Übersicht", icon: LayoutDashboard },
@@ -117,6 +132,10 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
   const displayName = getUserDisplayName(user);
   const initials = getUserInitials(user);
   const accountLabel = user.is_staff ? "Mitarbeiterkonto" : "Kundenkonto";
+
+  const activeOrders = orders.filter(isActiveOrder);
+  const pendingOrders = orders.filter((o) => o.payment_status === "pending");
+  const latestOrder = orders[0];
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -270,10 +289,19 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
               {/* KPI cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { label: "Aktive Bestellungen", value: "2", sub: "1 in Lieferung", icon: ShoppingBag, color: "text-blue-600", bg: "bg-blue-50" },
-                  { label: "Offene Rechnungen", value: "1", sub: "393,50 €", icon: FileText, color: "text-amber-600", bg: "bg-amber-50" },
-                  { label: "Jahresertrag", value: `${totalKwh.toLocaleString("de-DE")} kWh`, sub: "seit Jan 2025", icon: Zap, color: "text-green-600", bg: "bg-green-50" },
-                  { label: "Einsparungen", value: `${totalSaved.toLocaleString("de-DE")} €`, sub: "Stromkosten gespart", icon: Euro, color: "text-purple-600", bg: "bg-purple-50" },
+                  {
+                    label: "Aktive Bestellungen",
+                    value: ordersLoading ? "…" : String(activeOrders.length),
+                    sub: ordersLoading
+                      ? "wird geladen …"
+                      : pendingOrders.length > 0
+                      ? `${pendingOrders.length} Zahlung ausstehend`
+                      : "Alle bezahlt",
+                    icon: ShoppingBag, color: "text-blue-600", bg: "bg-blue-50", demo: false,
+                  },
+                  { label: "Offene Rechnungen", value: "1", sub: "393,50 €", icon: FileText, color: "text-amber-600", bg: "bg-amber-50", demo: true },
+                  { label: "Jahresertrag", value: `${totalKwh.toLocaleString("de-DE")} kWh`, sub: "seit Jan 2025", icon: Zap, color: "text-green-600", bg: "bg-green-50", demo: true },
+                  { label: "Einsparungen", value: `${totalSaved.toLocaleString("de-DE")} €`, sub: "Stromkosten gespart", icon: Euro, color: "text-purple-600", bg: "bg-purple-50", demo: true },
                 ].map((card) => {
                   const Icon = card.icon;
                   return (
@@ -285,7 +313,10 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
                         <TrendingUp size={13} className="text-muted-foreground mt-1" />
                       </div>
                       <div className="text-foreground mb-0.5" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1.25rem" }}>{card.value}</div>
-                      <div className="text-muted-foreground text-xs mb-0.5">{card.label}</div>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <div className="text-muted-foreground text-xs">{card.label}</div>
+                        {card.demo && <DemoDataBadge />}
+                      </div>
                       <div className="text-muted-foreground text-xs opacity-70">{card.sub}</div>
                     </div>
                   );
@@ -300,13 +331,23 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
                     Alle anzeigen <ChevronRight size={13} />
                   </button>
                 </div>
-                <OrderCard order={ORDERS[1]} expanded={true} onToggle={() => {}} />
+                {ordersLoading && <p className="text-muted-foreground text-sm">Bestellungen werden geladen …</p>}
+                {ordersError && <p className="text-destructive text-sm">{ordersError}</p>}
+                {!ordersLoading && !ordersError && !latestOrder && (
+                  <p className="text-muted-foreground text-sm">Noch keine Bestellungen vorhanden.</p>
+                )}
+                {latestOrder && (
+                  <OrderCard order={latestOrder} expanded={true} onToggle={() => {}} />
+                )}
               </div>
 
               {/* Monthly chart preview */}
               <div className="bg-card border border-border rounded-xl p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-foreground" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1rem" }}>PV-Ertrag 2025</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-foreground" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1rem" }}>PV-Ertrag 2025</h2>
+                    <DemoDataBadge />
+                  </div>
                   <button onClick={() => setActiveTab("performance")} className="text-accent text-xs font-semibold flex items-center gap-1">
                     Details <ChevronRight size={13} />
                   </button>
@@ -336,7 +377,16 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
           {/* ORDERS */}
           {activeTab === "orders" && (
             <div className="space-y-4">
-              {ORDERS.map((order) => (
+              {ordersLoading && (
+                <p className="text-muted-foreground text-sm">Bestellungen werden geladen …</p>
+              )}
+              {ordersError && (
+                <p className="text-destructive text-sm">{ordersError}</p>
+              )}
+              {!ordersLoading && !ordersError && orders.length === 0 && (
+                <p className="text-muted-foreground text-sm">Noch keine Bestellungen vorhanden.</p>
+              )}
+              {orders.map((order) => (
                 <OrderCard
                   key={order.id}
                   order={order}
@@ -350,6 +400,16 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
           {/* INVOICES */}
           {activeTab === "invoices" && (
             <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <h2 className="text-foreground" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1rem" }}>
+                  Rechnungen
+                </h2>
+                <DemoDataBadge />
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Diese Ansicht zeigt aktuell Beispieldaten – die Rechnungsanbindung folgt,
+                sobald eine entsprechende Datenquelle existiert.
+              </p>
               <div className="bg-card border border-border rounded-xl overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
@@ -397,6 +457,16 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
           {/* PERFORMANCE */}
           {activeTab === "performance" && (
             <div className="space-y-5">
+              <div className="flex items-center gap-2">
+                <h2 className="text-foreground" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1rem" }}>
+                  PV-Leistung
+                </h2>
+                <DemoDataBadge />
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Diese Ansicht zeigt aktuell Beispieldaten – eine Anbindung an ein echtes
+                PV-Monitoring-System ist derzeit nicht vorgesehen.
+              </p>
               {/* System info */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
@@ -482,13 +552,17 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
 }
 
 function OrderCard({ order, expanded, onToggle }: {
-  order: typeof ORDERS[0];
+  order: ConfirmedOrder;
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const status = statusConfig[order.status as keyof typeof statusConfig];
+  const status = paymentStatusConfig[order.payment_status as keyof typeof paymentStatusConfig] ?? paymentStatusConfig.pending;
+  const statusLabel =
+    ORDER_STATUS_LABELS[order.payment_status as keyof typeof ORDER_STATUS_LABELS] ?? order.payment_status;
   const StatusIcon = status.icon;
-  const currentStep = order.steps.filter(s => s.done).length - 1;
+  const steps = buildOrderTimeline(order);
+  const currentStep = steps.filter((s) => s.done).length - 1;
+  const itemsSummary = order.items.map((entry) => `${entry.item_name} × ${entry.quantity}`).join(" + ");
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -498,18 +572,18 @@ function OrderCard({ order, expanded, onToggle }: {
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-foreground font-mono font-semibold" style={{ fontSize: "0.85rem" }}>{order.id}</span>
+            <span className="text-foreground font-mono font-semibold" style={{ fontSize: "0.85rem" }}>{order.order_number}</span>
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${status.bg} ${status.color}`}>
               <StatusIcon size={10} />
-              {status.label}
+              {statusLabel}
             </span>
           </div>
-          <p className="text-muted-foreground text-xs truncate">{order.items}</p>
-          <p className="text-muted-foreground text-xs mt-0.5">{order.date}</p>
+          <p className="text-muted-foreground text-xs truncate">{itemsSummary}</p>
+          <p className="text-muted-foreground text-xs mt-0.5">{formatOrderDate(order.created_at)}</p>
         </div>
         <div className="flex items-center gap-4 shrink-0">
           <div className="text-foreground font-bold text-right" style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem" }}>
-            {order.total.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+            {Number(order.total).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
           </div>
           <ChevronRight size={16} className={`text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
         </div>
@@ -517,10 +591,10 @@ function OrderCard({ order, expanded, onToggle }: {
 
       {expanded && (
         <div className="border-t border-border px-5 py-5 bg-muted/10">
-          <h4 className="text-foreground mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Lieferstatus</h4>
+          <h4 className="text-foreground mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Zahlungsstatus</h4>
           <div className="relative">
-            {order.steps.map((step, idx) => {
-              const isLast = idx === order.steps.length - 1;
+            {steps.map((step, idx) => {
+              const isLast = idx === steps.length - 1;
               const isDone = step.done;
               const isCurrent = idx === currentStep + 1;
               return (
@@ -550,6 +624,14 @@ function OrderCard({ order, expanded, onToggle }: {
                 </div>
               );
             })}
+            {(order.payment_status === "failed" || order.payment_status === "cancelled") && (
+              <p className="text-xs mt-1 flex items-center gap-1.5 text-red-600">
+                <AlertCircle size={12} />
+                {order.payment_status === "failed"
+                  ? "Zahlung fehlgeschlagen."
+                  : "Bestellung storniert."}
+              </p>
+            )}
           </div>
         </div>
       )}

@@ -63,6 +63,32 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+const CART_STORAGE_KEY = "k39_cart_v1";
+
+export function isValidCartItem(value: unknown): value is CartItem {
+    if (!value || typeof value !== "object") return false;
+    const entry = value as Record<string, unknown>;
+    return (
+        typeof entry.id === "number" &&
+        typeof entry.name === "string" &&
+        typeof entry.price === "number" &&
+        typeof entry.qty === "number" &&
+        entry.qty > 0
+    );
+}
+
+export function loadStoredCart(): CartItem[] {
+    if (typeof window === "undefined") return [];
+    try {
+        const raw = localStorage.getItem(CART_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter(isValidCartItem) : [];
+    } catch {
+        return [];
+    }
+}
+
 export function AppProvider({children}: { children: ReactNode }) {
     const [cart, setCart] = useState<CartItem[]>([]);
     const [showCart, setShowCart] = useState(false);
@@ -97,6 +123,17 @@ export function AppProvider({children}: { children: ReactNode }) {
             cancelled = true;
         };
     }, []);
+
+    // Wiederherstellen nach Mount (SSR-sicher)
+    useEffect(() => {
+        setCart(loadStoredCart());
+    }, []);
+
+    // Persistieren bei jeder Änderung (SSR-sicher)
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    }, [cart]);
 
     const addToCart = (product: CatalogProduct, qty = 1) => {
         setCart((prev) => {
