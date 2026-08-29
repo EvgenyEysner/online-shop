@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -128,3 +128,23 @@ class ItemsViewSetTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
         self.assertFalse(Item.objects.filter(name="Neues Kabel").exists())
+
+
+class ItemTaxPropertyTests(TestCase):
+
+    def test_tax_uses_default_tax_rate(self):
+        item = Item.objects.create(name="Kabel", price=Decimal("100.00"), on_stock=1)
+
+        self.assertEqual(item.tax, Decimal("19.00"))
+
+    @override_settings(TAX_RATE=Decimal("0.07"))
+    def test_tax_reflects_overridden_tax_rate(self):
+        item = Item.objects.create(name="Kabel", price=Decimal("100.00"), on_stock=1)
+
+        self.assertEqual(item.tax, Decimal("7.00"))
+
+    @override_settings(TAX_RATE=Decimal("0"))
+    def test_tax_is_zero_when_tax_rate_is_zero(self):
+        item = Item.objects.create(name="Kabel", price=Decimal("100.00"), on_stock=1)
+
+        self.assertEqual(item.tax, Decimal("0.00"))

@@ -18,7 +18,9 @@ class OrderViewSetTests(TestCase):
     def setUpTestData(cls):
         cls.owner = baker.make(User, email="owner@example.com")
         cls.other = baker.make(User, email="other@example.com")
-        cls.item = baker.make(Item, name="Solarmodul", price=Decimal("100.00"), on_stock=5)
+        cls.item = baker.make(
+            Item, name="Solarmodul", price=Decimal("100.00"), on_stock=5
+        )
         cls.order = baker.make(
             Order,
             customer=cls.owner,

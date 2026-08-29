@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from core.services.allocation import GlobalIdentifier
+from apps.core.models import GlobalIdentifier
 
 
 class GlobalIdentifierTests(TestCase):

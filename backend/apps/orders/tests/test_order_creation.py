@@ -49,9 +49,7 @@ class OrderCreationServiceTests(TestCase):
         cls.customer = baker.make(User, email="customer@example.com")
 
     def test_create_from_payload_creates_order_items_and_reserves_stock(self):
-        expected = PricingService.calculate_totals(
-            [{"item": self.item, "quantity": 2}]
-        )
+        expected = PricingService.calculate_totals([{"item": self.item, "quantity": 2}])
 
         order = OrderCreationService.create_from_payload(
             payload=payload_for(item=self.item, quantity=2),
@@ -61,7 +59,9 @@ class OrderCreationServiceTests(TestCase):
 
         self.item.refresh_from_db()
         self.assertEqual(self.item.on_stock, 3)
-        self.assertTrue(order.order_number.startswith(f"{settings.SHOP_NUMBER_PREFIX}-"))
+        self.assertTrue(
+            order.order_number.startswith(f"{settings.SHOP_NUMBER_PREFIX}-")
+        )
         self.assertEqual(order.email, "buyer@example.com")
         self.assertEqual(order.payment_status, Order.PaymentStatus.PAID)
         self.assertEqual(order.stripe_session_id, "cs_test_create")
@@ -104,7 +104,9 @@ class OrderCreationServiceTests(TestCase):
 
         self.item.refresh_from_db()
         self.assertEqual(first.id, second.id)
-        self.assertEqual(Order.objects.filter(stripe_session_id="cs_test_idempotent").count(), 1)
+        self.assertEqual(
+            Order.objects.filter(stripe_session_id="cs_test_idempotent").count(), 1
+        )
         self.assertEqual(self.item.on_stock, stock_after_first)
         self.assertEqual(OrderItem.objects.filter(order=first).count(), 1)
 
@@ -132,7 +134,9 @@ class OrderCreationServiceTests(TestCase):
                 stripe_session_id="cs_test_stock",
             )
 
-        self.assertFalse(Order.objects.filter(stripe_session_id="cs_test_stock").exists())
+        self.assertFalse(
+            Order.objects.filter(stripe_session_id="cs_test_stock").exists()
+        )
         self.item.refresh_from_db()
         self.assertEqual(self.item.on_stock, 5)
 

@@ -5,7 +5,6 @@ from apps.core.services.allocation import NumberAllocationService
 
 
 class CustomerNumberServiceTests(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.first = NumberAllocationService.allocate_customer_number()
