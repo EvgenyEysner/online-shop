@@ -6,10 +6,10 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "adrf>=0.1.13",
-    "black>=26.5.1",
     "celery>=5.6.2",
+    "cryptography>=50.0.0",
     "daphne>=4.2.2",
-    "django>=6.0.2",
+    "django>=6.0.8,<6.1",
     "django-cors-headers>=4.9.0",
     "django-csp>=4.0",
     "django-environ>=0.12.0",
@@ -27,5 +27,61 @@ dependencies = [
     "pillow>=12.1.0",
     "psycopg2-binary>=2.9.11",
     "requests>=2.34.2",
+    "sqlparse>=0.6.0",
     "stripe>=15.3.1",
 ]
+
+[dependency-groups]
+dev = [
+    "black>=26.5.1",
+    "mypy>=2.3.1",
+]
+
+[tool.black]
+target-version = "py313"
+line-length = 88
+extend-exclude = ["migrations"]   # generated files, reviewed by hand
+
+[tool.black.lint]
+select = [
+    "E", "W", # pycodestyle
+    "F", # pyflakes
+    "I", # import sorting
+    "N", # pep8-naming
+    "UP", # pyupgrade keeps 3.13 idioms
+    "B", # bugbear
+    "C4", # comprehensions
+    "DTZ", # naive datetime the repo's TIMESTAMPTZ rule, enforced by the linter
+    "ASYNC", # blocking calls in async defs
+    "S", # bandit security rules
+    "T20", # stray print()
+    "SIM", "RUF",
+]
+
+[tool.black.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]   # asserts and hardcoded test credentials are fine here
+# N818: the APIError subclasses are named after the HTTP status they carry, so the raise
+# site reads raise NotFound(...). An Error suffix would only repeat what the base class
+# already says. Mirrors backend/pyproject.toml verbatim.
+"exceptions/errors.py" = ["N818"]
+
+[tool.mypy]
+python_version = "3.13"
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+# Required, not optional: flat top-level packages with no __init__.py mean mypy would
+# otherwise map e.g. crud/x.py and schemas/x.py to the same module name and abort with
+# "Duplicate module named x" before checking anything (same trap as backend/pyproject.toml).
+explicit_package_bases = true
+namespace_packages = true
+
+testpaths = ["tests"]
+
+pythonpath = ["."]
+addopts = ["--import-mode=importlib"]
+
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"

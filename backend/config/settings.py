@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -6,7 +7,7 @@ from typing import List, Tuple
 
 import environ
 from corsheaders.defaults import default_methods
-from django.templatetags.static import static
+from django.core.exceptions import ImproperlyConfigured
 
 env = environ.Env(
     # set casting, default value
@@ -87,27 +88,12 @@ DATABASES = {
 }
 
 UNFOLD = {
-    "SITE_TITLE": "Webseite Verwaltung",
-    "SITE_DROPDOWN": [
-        {
-            "icon": "diamond",
-            "title": "Garmonia Kosmetikstudio",
-            "link": "https://schoenheitsecke-oldenburg.de",
-        },
-    ],
-    "SITE_URL": "https://schoenheitsecke-oldenburg.de",
-    "SITE_LOGO": {
-        "light": lambda request: static("image/garmonia_logo_neu.webp"),
-        "dark": lambda request: static("image/garmonia_logo_neu.webp"),
-    },
-    "SITE_SYMBOL": "speed",
+    "SITE_TITLE": "König 39 Solar & Elektro",
+    "SITE_SYMBOL": "bolt",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": True,
     "SHOW_BACK_BUTTON": False,
     "THEME": "light",
-    "LOGIN": {
-        "image": lambda request: static("image/home-header.webp"),
-    },
     "BORDER_RADIUS": "6px",
     "COLORS": {
         # Sand (Sekundär) – frontend --color-sand-*
@@ -280,9 +266,12 @@ ORDER_NUMBER_START = env.int("ORDER_NUMBER_START", default=1000)
 TAX_RATE = Decimal(env("TAX_RATE"))
 FREE_SHIPPING_THRESHOLD = Decimal(env("FREE_SHIPPING_THRESHOLD"))
 SHIPPING_COST = Decimal(env("SHIPPING_COST"))
-CURRENCY: str = env(
-    "CURRENCY", default="eur"
-)  # ISO-4217-Kleinbuchstaben-Code, siehe Stripe-Doku
+CURRENCY: str = env("CURRENCY", default="eur").strip().lower()  # sieh strip docs
+if not re.fullmatch(r"[a-z]{3}", CURRENCY):
+    raise ImproperlyConfigured(
+        f"CURRENCY muss ein 3-stelliger ISO-4217-Code sein (z. B. 'eur'), "
+        f"erhalten: {CURRENCY!r}"
+    )
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
