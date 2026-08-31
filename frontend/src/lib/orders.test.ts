@@ -1,13 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/src/lib/api";
 import * as auth from "@/src/lib/auth";
+import * as catalog from "@/src/lib/catalog";
 import {
   fetchMyOrders,
   formatOrderItemsSummary,
   isActiveOrder,
+  reorder,
   type ConfirmedOrder,
   type ConfirmedOrderItem,
 } from "@/src/lib/orders";
+import type { CatalogProduct } from "@/src/types/catalog";
 
 function makeOrder(overrides: Partial<ConfirmedOrder> = {}): ConfirmedOrder {
   return {
@@ -33,6 +36,14 @@ function makeOrder(overrides: Partial<ConfirmedOrder> = {}): ConfirmedOrder {
     total: "11.90",
     items: [],
     created_at: "2026-01-01T00:00:00Z",
+    paid_at: "2026-01-01T00:05:00Z",
+    fulfillment_status: "pending",
+    tracking_number: "",
+    carrier: "",
+    shipped_at: null,
+    delivered_at: null,
+    has_invoice: false,
+    can_request_return: false,
     ...overrides,
   };
 }
@@ -41,6 +52,7 @@ function makeItem(overrides: Partial<ConfirmedOrderItem> = {}): ConfirmedOrderIt
   return {
     id: 1,
     item: "1",
+    item_id: 1,
     item_name: "Solarmodul",
     unit_price: "100.00",
     quantity: 1,
@@ -147,6 +159,53 @@ describe("formatOrderItemsSummary", () => {
     const order = makeOrder({ items: [] });
 
     expect(formatOrderItemsSummary(order)).toBe("");
+  });
+});
+
+describe("reorder", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("legt nur verfügbare Artikel in den Warenkorb und listet fehlende", async () => {
+    const available: CatalogProduct = {
+      id: 1,
+      name: "Solarmodul",
+      description: "",
+      price: 199,
+      rating: 0,
+      reviews: 0,
+      category: "solar",
+      image: "",
+      specs: [],
+      onStock: 1,
+    };
+    vi.spyOn(catalog, "fetchItemsByIds").mockResolvedValue([available]);
+    const addToCart = vi.fn();
+
+    const result = await reorder(
+      makeOrder({
+        items: [
+          makeItem({ item_id: 1, item_name: "Solarmodul", quantity: 3 }),
+          makeItem({ id: 2, item_id: 2, item_name: "Kabel", quantity: 1 }),
+        ],
+      }),
+      addToCart
+    );
+
+    expect(addToCart).toHaveBeenCalledTimes(1);
+    expect(addToCart).toHaveBeenCalledWith(available, 1);
+    expect(result).toEqual({ addedCount: 1, unavailable: ["Kabel"] });
+  });
+
+  it("behandelt eine leere Bestellung ohne API-Aufruf-Fehler", async () => {
+    vi.spyOn(catalog, "fetchItemsByIds").mockResolvedValue([]);
+    const addToCart = vi.fn();
+
+    const result = await reorder(makeOrder({ items: [] }), addToCart);
+
+    expect(addToCart).not.toHaveBeenCalled();
+    expect(result).toEqual({ addedCount: 0, unavailable: [] });
   });
 });
 
