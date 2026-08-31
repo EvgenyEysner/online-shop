@@ -115,6 +115,18 @@ class ItemsViewSetTests(TestCase):
         self.assertEqual(response.data["name"], "Solarmodul")
         self.assertEqual(response.data["category"], "solarmodule")
 
+    def test_list_filters_by_id_in_and_excludes_out_of_stock(self):
+        response = self.client.get(
+            ITEMS_URL,
+            {"id__in": f"{self.item_solar.id},{self.item_out_of_stock.id}"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [item["id"] for item in response.data["results"]]
+        self.assertEqual(ids, [self.item_solar.id])
+        self.assertNotIn(self.item_inverter.id, ids)
+        self.assertNotIn(self.item_out_of_stock.id, ids)
+
     def test_create_not_allowed(self):
         response = self.client.post(
             ITEMS_URL,
