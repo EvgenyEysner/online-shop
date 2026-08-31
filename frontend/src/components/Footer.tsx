@@ -1,5 +1,6 @@
 "use client";
 import { Sun, Phone, Mail, MapPin, Facebook, Instagram, Linkedin } from "lucide-react";
+import { LEGAL_PAGES } from "@/src/lib/legal";
 
 export function Footer() {
   return (
@@ -83,8 +84,14 @@ export function Footer() {
         <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
           <p className="text-white/30 text-xs">© 2025 König 39 GmbH. Alle Rechte vorbehalten.</p>
           <div className="flex gap-4">
-            {["Impressum", "Datenschutz", "AGB", "Widerruf"].map((link) => (
-              <a key={link} href="#" className="text-white/30 text-xs hover:text-accent/70 transition-colors">{link}</a>
+            {LEGAL_PAGES.map((page) => (
+              <a
+                key={page.slug}
+                href={`/legal/${page.slug}`}
+                className="text-white/30 text-xs hover:text-accent/70 transition-colors"
+              >
+                {page.title}
+              </a>
             ))}
           </div>
         </div>
