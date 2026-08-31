@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 
@@ -20,12 +20,6 @@ class PricingService:
         """
         Löst Item-Referenzen (PK oder Instanz) zu Item-Objekten auf.
         Holt alle fehlenden Items in einer einzigen Query.
-
-        Prüft die Menge gegen den zum Abfragezeitpunkt gelesenen Bestand
-        (ungesperrt) – dient als frühes UX-Feedback (z. B. 400 statt eine
-        Stripe-Session zu erzeugen). Die verbindliche, gesperrte Prüfung
-        passiert erst in OrderCreationService._reserve_stock() beim
-        tatsächlichen Anlegen der Order.
         """
         missing_ids = [
             entry["item"] for entry in raw_items if not isinstance(entry["item"], Item)
