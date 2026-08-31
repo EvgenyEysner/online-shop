@@ -1,0 +1,13 @@
+Hallo {{ order.shipping_first_name }} {{ order.shipping_last_name }},
+
+Ihre Bestellung {{ order.order_number }} wurde soeben versandt.
+{% if order.tracking_number %}
+Sendungsnummer: {{ order.tracking_number }}
+{% endif %}{% if order.carrier %}
+Versanddienstleister: {{ order.carrier }}
+{% endif %}
+Den aktuellen Status Ihrer Bestellung sehen Sie jederzeit in Ihrem Kundenkonto:
+{{ dashboard_url }}
+
+Mit freundlichen Grüßen
+Ihr Team

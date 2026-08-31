@@ -2,13 +2,26 @@ from decimal import Decimal
 from typing import Any
 
 from adrf import serializers
+from asgiref.sync import sync_to_async
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError
 from rest_framework.relations import PrimaryKeyRelatedField, SlugRelatedField
 
 from apps.orders.exceptions import InsufficientStockError
-from apps.orders.models import Category, Item, Order, OrderItem
+from apps.orders.models import (
+    Category,
+    Invoice,
+    Item,
+    Order,
+    OrderItem,
+    ReturnRequest,
+    ReturnRequestItem,
+    Review,
+)
 from apps.orders.services.order import OrderService
 from apps.orders.services.pricing import PricingService
+from apps.orders.services.returns import ReturnService
+from apps.orders.services.review import ReviewService
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -68,6 +81,10 @@ class ItemSerializer(serializers.ModelSerializer):
 
 class OrderItemSerializer(serializers.ModelSerializer):
     item = SlugRelatedField(slug_field="name", read_only=True, allow_null=True)
+    # Zusätzlich zum Namen (item) auch die rohe Artikel-ID, damit das
+    # Frontend gezielt die aktuellen Artikeldaten nachladen kann (siehe
+    # ADR 0020, "Erneut bestellen") - additiv, item bleibt unverändert.
+    item_id = PrimaryKeyRelatedField(source="item", read_only=True)
     line_total = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
     )
@@ -77,6 +94,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "item",
+            "item_id",
             "item_name",
             "unit_price",
             "quantity",
@@ -86,6 +104,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    has_invoice = serializers.SerializerMethodField(read_only=True)
+    can_request_return = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Order
@@ -122,7 +142,145 @@ class OrderSerializer(serializers.ModelSerializer):
             "total",
             "items",
             "created_at",
+            "paid_at",
+            "fulfillment_status",
+            "tracking_number",
+            "carrier",
+            "shipped_at",
+            "delivered_at",
+            "has_invoice",
+            "can_request_return",
         ]
+
+    async def get_has_invoice(self, obj) -> bool:
+        return await Invoice.objects.filter(order=obj).aexists()
+
+    async def get_can_request_return(self, obj) -> bool:
+        return ReturnService.can_request_return(obj)
+
+
+class InvoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Invoice
+        fields = [  # noqa: RUF012 - Meta.fields ist projektweit unannotiert
+            "id",
+            "invoice_number",
+            "document_type",
+            "issued_at",
+            "net_amount",
+            "tax_rate",
+            "tax_amount",
+            "total_amount",
+            "sent_at",
+            "order",
+        ]
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+
+    customer = SlugRelatedField(slug_field="full_name", read_only=True)
+    customer_id = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Review
+        fields = (
+            "id",
+            "item",
+            "customer",
+            "customer_id",
+            "rating",
+            "comment",
+            "created_at",
+            "updated_at",
+        )
+
+    async def acreate(self, validated_data):
+        request = self.context["request"]
+        return await sync_to_async(ReviewService.upsert_review)(
+            request.user,
+            validated_data["item"],
+            rating=validated_data["rating"],
+            comment=validated_data.get("comment", ""),
+        )
+
+    async def aupdate(self, instance, validated_data):
+        request = self.context["request"]
+        return await sync_to_async(ReviewService.upsert_review)(
+            request.user,
+            instance.item,
+            rating=validated_data.get("rating", instance.rating),
+            comment=validated_data.get("comment", instance.comment),
+        )
+
+
+class ReturnRequestItemSerializer(serializers.ModelSerializer):
+    item_name = serializers.CharField(source="order_item.item_name", read_only=True)
+
+    class Meta:
+        model = ReturnRequestItem
+        fields = ("id", "order_item", "item_name", "quantity")
+
+
+class ReturnRequestSerializer(serializers.ModelSerializer):
+
+    items = ReturnRequestItemSerializer(many=True)
+
+    class Meta:
+        model = ReturnRequest
+        fields = (
+            "id",
+            "order",
+            "status",
+            "reason",
+            "requested_at",
+            "decided_at",
+            "rejection_note",
+            "refunded_at",
+            "items",
+        )
+        extra_kwargs = {  # noqa: RUF012 - von DRF vorgegebene Struktur
+            "status": {"read_only": True},
+            "requested_at": {"read_only": True},
+            "decided_at": {"read_only": True},
+            "rejection_note": {"read_only": True},
+            "refunded_at": {"read_only": True},
+        }
+
+    def validate(self, attrs):
+        request = self.context["request"]
+        order = attrs["order"]
+        if order.customer_id != request.user.id:
+            raise ValidationError(
+                {"order": "Diese Bestellung gehört nicht zu Ihrem Konto."}
+            )
+
+        items = attrs.get("items") or []
+        if not items:
+            raise ValidationError(
+                {"items": "Mindestens eine Rückgabeposition ist erforderlich."}
+            )
+        for entry in items:
+            order_item = entry["order_item"]
+            if order_item.order_id != order.id:
+                raise ValidationError(
+                    {
+                        "items": f"Bestellposition {order_item.pk} gehört nicht "
+                        "zu dieser Bestellung."
+                    }
+                )
+
+        return attrs
+
+    async def acreate(self, validated_data):
+        order = validated_data["order"]
+        items = validated_data["items"]
+        reason = validated_data.get("reason", "")
+        try:
+            return await sync_to_async(ReturnService.create_request)(
+                order, items=items, reason=reason
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError({"detail": exc.messages}) from exc
 
 
 class AddressSerializer(serializers.Serializer):

@@ -1,11 +1,15 @@
 import logging
+from typing import Any
 from uuid import uuid4
 
 import stripe
 from django.conf import settings
+from django.db import transaction
+from django.utils import timezone
 
 from apps.orders.exceptions import InsufficientStockError
-from apps.orders.models import CheckoutDraft, Order
+from apps.orders.models import CheckoutDraft, Order, OrderStatusHistory
+
 from .order_creation import OrderCreationService
 from .pricing import PricingService
 from .stripe_checkout import StripeCheckoutService
@@ -18,6 +22,35 @@ class OrderService:
     Orchestriert den Checkout-Flow: Draft anlegen, Stripe-Session
     erzeugen, Order-Erstellung bei erfolgreicher/pending Zahlung anstoßen.
     """
+
+    @staticmethod
+    @transaction.atomic
+    def mark_as_paid(order: Order, *, actor: Any = None) -> Order:
+        """
+        Einzige, zentrale Stelle, die eine Order als bezahlt markiert wird.
+        """
+        from apps.orders.services.invoice import InvoiceService
+
+        if order.payment_status != Order.PaymentStatus.PAID:
+            old_status = order.payment_status
+            order.payment_status = Order.PaymentStatus.PAID
+            order.paid_at = timezone.now()
+            order.save(update_fields=["payment_status", "paid_at"])
+            OrderStatusHistory.objects.create(
+                order=order,
+                status_type=OrderStatusHistory.StatusType.PAYMENT,
+                old_value=old_status,
+                new_value=Order.PaymentStatus.PAID,
+                changed_by=actor,
+            )
+            logger.info(
+                "Order %s als bezahlt markiert (actor=%s).",
+                order.order_number,
+                actor,
+            )
+
+        InvoiceService.ensure_invoice_for_order(order)
+        return order
 
     @staticmethod
     def create_checkout_session(

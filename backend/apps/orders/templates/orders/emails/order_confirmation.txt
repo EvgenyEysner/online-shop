@@ -1,0 +1,20 @@
+Hallo {{ order.shipping_first_name }} {{ order.shipping_last_name }},
+
+vielen Dank für Ihre Bestellung {{ order.order_number }} vom {{ order.created_at|date:"d.m.Y" }}.
+{% if order.payment_status == "paid" %}
+Ihre Zahlung ist bereits bei uns eingegangen. Vielen Dank!
+{% elif order.payment_method == "bank" or order.payment_method == "invoice" %}
+Bitte überweisen Sie den Rechnungsbetrag von {{ order.total }} € innerhalb von 14 Tagen unter Angabe der Bestellnummer {{ order.order_number }} als Verwendungszweck.
+{% else %}
+Ihre Zahlung wird derzeit verarbeitet. Sie erhalten eine weitere Nachricht, sobald diese bestätigt ist.
+{% endif %}
+Ihre bestellten Artikel:
+{% for order_item in order.items.all %}
+- {{ order_item.item_name }} ({{ order_item.quantity }}x) – {{ order_item.line_total }} €
+{% endfor %}
+Gesamtbetrag: {{ order.total }} €
+
+Bei Fragen zu Ihrer Bestellung antworten Sie einfach auf diese E-Mail.
+
+Mit freundlichen Grüßen
+Ihr Team

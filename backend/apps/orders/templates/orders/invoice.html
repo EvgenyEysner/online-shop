@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>{% if invoice.document_type == "credit_note" %}Gutschrift{% else %}Rechnung{% endif %} {{ invoice.invoice_number }}</title>
+<style>
+    @page {
+        size: A4;
+        margin: 2.2cm 2cm 2.6cm 2cm;
+
+        @bottom-center {
+            content: element(footer);
+        }
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif;
+        font-size: 10.5pt;
+        color: #1c1917;
+        line-height: 1.4;
+    }
+
+    .footer {
+        position: running(footer);
+        display: flex;
+        justify-content: space-between;
+        font-size: 8pt;
+        color: #78716c;
+        border-top: 0.5pt solid #d6d3d1;
+        padding-top: 4pt;
+    }
+
+    .footer .page-number::after {
+        content: "Seite " counter(page) " von " counter(pages);
+    }
+
+    .addresses {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 2.2cm;
+    }
+
+    .seller-block {
+        font-size: 8pt;
+        color: #78716c;
+        max-width: 8.5cm;
+    }
+
+    .buyer-block {
+        font-size: 10.5pt;
+        white-space: pre-line;
+    }
+
+    .document-header {
+        margin-bottom: 0.6cm;
+    }
+
+    .document-title {
+        font-size: 20pt;
+        font-weight: 700;
+        color: #292524;
+        margin: 0 0 0.3cm 0;
+    }
+
+    .credit-note .document-title {
+        color: #8f6942;
+    }
+
+    .credit-note-reference {
+        font-size: 9.5pt;
+        color: #57534e;
+        margin-bottom: 0.4cm;
+    }
+
+    .meta-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 0.8cm;
+        font-size: 9.5pt;
+    }
+
+    .meta-table td {
+        padding: 1pt 0;
+    }
+
+    .meta-table td:first-child {
+        color: #78716c;
+        padding-right: 0.6cm;
+        white-space: nowrap;
+    }
+
+    table.items {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 0.6cm;
+    }
+
+    table.items thead {
+        display: table-header-group; /* Kopfzeile auf jeder Seite wiederholen */
+    }
+
+    table.items th {
+        text-align: left;
+        font-size: 8.5pt;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        color: #78716c;
+        border-bottom: 1pt solid #292524;
+        padding: 5pt 6pt;
+    }
+
+    table.items td {
+        padding: 5pt 6pt;
+        border-bottom: 0.5pt solid #e7e5e4;
+        vertical-align: top;
+    }
+
+    table.items .col-pos { width: 6%; }
+    table.items .col-name { width: 44%; }
+    table.items .col-qty { width: 12%; text-align: right; }
+    table.items .col-unit { width: 19%; text-align: right; }
+    table.items .col-total { width: 19%; text-align: right; }
+
+    table.items td.col-pos,
+    table.items td.col-qty,
+    table.items td.col-unit,
+    table.items td.col-total {
+        text-align: right;
+    }
+
+    .totals {
+        width: 100%;
+        margin-top: 0.3cm;
+    }
+
+    .totals table {
+        margin-left: auto;
+        width: 8.5cm;
+        border-collapse: collapse;
+    }
+
+    .totals td {
+        padding: 3pt 0;
+        font-size: 10pt;
+    }
+
+    .totals td.label {
+        color: #57534e;
+    }
+
+    .totals td.value {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .totals tr.grand-total td {
+        border-top: 1pt solid #292524;
+        font-weight: 700;
+        font-size: 11.5pt;
+        padding-top: 6pt;
+    }
+
+    .amount-negative {
+        color: #8f6942;
+    }
+
+    .legal-note {
+        margin-top: 1cm;
+        font-size: 8.5pt;
+        color: #78716c;
+    }
+</style>
+</head>
+<body class="{% if invoice.document_type == 'credit_note' %}credit-note{% endif %}">
+
+<div class="footer">
+    <span>{{ company.name }} &middot; {{ company.street }} &middot; {{ company.zip }} {{ company.city }}</span>
+    <span class="page-number"></span>
+</div>
+
+<div class="addresses">
+    <div class="seller-block">
+        {{ company.name }}<br>
+        {{ company.street }}<br>
+        {{ company.zip }} {{ company.city }}<br>
+        {{ company.country }}<br>
+        Steuernummer/USt-IdNr.: {{ company.tax_id }}
+    </div>
+    <div class="buyer-block">{{ invoice.buyer_name }}
+{{ invoice.buyer_street }}
+{{ invoice.buyer_zip }} {{ invoice.buyer_city }}
+{{ invoice.buyer_country }}</div>
+</div>
+
+<div class="document-header">
+    {% if invoice.document_type == "credit_note" %}
+        <p class="document-title">Gutschrift</p>
+        <p class="credit-note-reference">
+            Korrekturrechnung zur Rechnung {{ invoice.credited_invoice.invoice_number }}
+            {% if invoice.reason %}&mdash; Grund: {{ invoice.reason }}{% endif %}
+        </p>
+    {% else %}
+        <p class="document-title">Rechnung</p>
+    {% endif %}
+</div>
+
+<table class="meta-table">
+    <tr>
+        <td>{% if invoice.document_type == "credit_note" %}Gutschrift-Nr.{% else %}Rechnungs-Nr.{% endif %}</td>
+        <td>{{ invoice.invoice_number }}</td>
+    </tr>
+    <tr>
+        <td>Ausstellungsdatum</td>
+        <td>{{ invoice.issued_at|date:"d.m.Y" }}</td>
+    </tr>
+    <tr>
+        <td>Leistungsdatum</td>
+        <td>{{ invoice.service_date|date:"d.m.Y" }}</td>
+    </tr>
+    <tr>
+        <td>Bestellnummer</td>
+        <td>{{ order.order_number }}</td>
+    </tr>
+</table>
+
+<table class="items">
+    <thead>
+        <tr>
+            <th class="col-pos">Pos.</th>
+            <th class="col-name">Bezeichnung</th>
+            <th class="col-qty">Menge</th>
+            <th class="col-unit">Einzelpreis</th>
+            <th class="col-total">Gesamtpreis</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for order_item in items %}
+        <tr>
+            <td class="col-pos">{{ forloop.counter }}</td>
+            <td class="col-name">{{ order_item.item_name }}</td>
+            <td class="col-qty">{{ order_item.quantity }}</td>
+            <td class="col-unit">{{ order_item.unit_price|floatformat:2 }} {{ currency }}</td>
+            <td class="col-total">{{ order_item.line_total|floatformat:2 }} {{ currency }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="totals">
+    <table>
+        <tr>
+            <td class="label">Nettobetrag</td>
+            <td class="value {% if invoice.document_type == 'credit_note' %}amount-negative{% endif %}">{% if invoice.document_type == "credit_note" %}-{% endif %}{{ invoice.net_amount|floatformat:2 }} {{ currency }}</td>
+        </tr>
+        <tr>
+            <td class="label">zzgl. {{ invoice.tax_rate_percent|floatformat:"-2" }}&nbsp;% MwSt.</td>
+            <td class="value {% if invoice.document_type == 'credit_note' %}amount-negative{% endif %}">{% if invoice.document_type == "credit_note" %}-{% endif %}{{ invoice.tax_amount|floatformat:2 }} {{ currency }}</td>
+        </tr>
+        <tr class="grand-total">
+            <td class="label">{% if invoice.document_type == "credit_note" %}Gutschriftsbetrag{% else %}Gesamtbetrag{% endif %}</td>
+            <td class="value {% if invoice.document_type == 'credit_note' %}amount-negative{% endif %}">{% if invoice.document_type == "credit_note" %}-{% endif %}{{ invoice.total_amount|floatformat:2 }} {{ currency }}</td>
+        </tr>
+    </table>
+</div>
+
+<p class="legal-note">
+    {% if invoice.document_type == "credit_note" %}
+        Diese Gutschrift korrigiert die oben genannte Rechnung. Alle Beträge werden dem Kunden
+        gutgeschrieben bzw. erstattet.
+    {% else %}
+        Die Zahlung erfolgte am {{ invoice.service_date|date:"d.m.Y" }} vor Lieferung/Leistung
+        (§14 Abs. 4 Nr. 6 UStG). Diese Rechnung wurde elektronisch erstellt und ist auch ohne
+        Unterschrift gültig.
+    {% endif %}
+</p>
+
+</body>
+</html>

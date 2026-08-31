@@ -227,6 +227,18 @@ class Order(models.Model):
     shipped_at = models.DateTimeField("versandt am", null=True, blank=True)
     delivered_at = models.DateTimeField("zugestellt am", null=True, blank=True)
 
+    # Transaktions-E-Mails (siehe ADR 0015), Idempotenz-Muster analog
+    # Invoice.sent_at.
+    confirmation_sent_at = models.DateTimeField(
+        "Bestellbestätigung versendet am", null=True, blank=True, editable=False
+    )
+    shipping_notification_sent_at = models.DateTimeField(
+        "Versand-Benachrichtigung versendet am",
+        null=True,
+        blank=True,
+        editable=False,
+    )
+
     class Meta:
         verbose_name = "Bestellung"
         verbose_name_plural = "Bestellungen"
@@ -452,3 +464,123 @@ class Invoice(models.Model):
         raise ValueError(
             "Invoice darf laut GoBD-Aufbewahrungspflicht nicht gelöscht werden."
         )
+
+
+class ReturnRequest(models.Model):
+    """
+    Self-Service Rückgabe/Widerruf einer Order. Eigene
+    Entität statt eines dritten Statusfelds auf Order (analog zur
+    Begründung für Invoice/OrderStatusHistory), da der Vorgang granularer
+    (Item-/Mengen genau, siehe ReturnRequestItem) und mehrstufig ist
+    (REQUESTED -> APPROVED -> REFUNDED bzw. REJECTED), mit eigenen
+    Zeitstempeln/Entscheidern.
+    """
+
+    class Status(models.TextChoices):
+        REQUESTED = "requested", "Angefragt"
+        APPROVED = "approved", "Genehmigt"
+        REJECTED = "rejected", "Abgelehnt"
+        REFUNDED = "refunded", "Erstattet"
+
+    order = models.ForeignKey(
+        Order,
+        verbose_name="Bestellung",
+        on_delete=models.PROTECT,
+        related_name="return_requests",
+    )
+    status = models.CharField(
+        "Status",
+        max_length=16,
+        choices=Status.choices,
+        default=Status.REQUESTED,
+        db_index=True,
+    )
+    reason = models.TextField("Grund", max_length=500)
+    requested_at = models.DateTimeField("angefragt am", auto_now_add=True)
+    decided_at = models.DateTimeField("entschieden am", null=True, blank=True)
+    decided_by = models.ForeignKey(
+        User,
+        verbose_name="entschieden von",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    rejection_note = models.CharField(
+        "Ablehnungsgrund", max_length=255, blank=True, default=""
+    )
+    refunded_at = models.DateTimeField("erstattet am", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Rückgabeanfrage"
+        verbose_name_plural = "Rückgabeanfragen"
+        ordering = ("-requested_at",)
+
+    def __str__(self) -> str:
+        return f"Rückgabe #{self.pk} zu {self.order.order_number}"
+
+
+class ReturnRequestItem(models.Model):
+    """
+    Einzelposition einer ReturnRequest
+    """
+
+    return_request = models.ForeignKey(
+        ReturnRequest,
+        verbose_name="Rückgabeanfrage",
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    order_item = models.ForeignKey(
+        OrderItem,
+        verbose_name="Bestellposition",
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+    quantity = models.PositiveSmallIntegerField("Menge")
+
+    class Meta:
+        verbose_name = "Rückgabeposition"
+        verbose_name_plural = "Rückgabepositionen"
+        ordering = ("return_request_id",)
+
+    def __str__(self) -> str:
+        return f"{self.order_item.item_name} x{self.quantity}"
+
+
+class Review(models.Model):
+    """
+    Produktbewertung eines verifizierten Käufers.
+    """
+
+    item = models.ForeignKey(
+        Item,
+        verbose_name="Artikel",
+        on_delete=models.CASCADE,
+        related_name="product_reviews",
+    )
+    customer = models.ForeignKey(
+        User,
+        verbose_name=User._meta.verbose_name,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+    rating = models.PositiveSmallIntegerField(
+        "Bewertung", choices=[(i, str(i)) for i in range(1, 6)]
+    )
+    comment = models.TextField("Kommentar", max_length=1000, blank=True, default="")
+    created_at = models.DateTimeField("erstellt am", auto_now_add=True)
+    updated_at = models.DateTimeField("geändert am", auto_now=True)
+
+    class Meta:
+        verbose_name = "Bewertung"
+        verbose_name_plural = "Bewertungen"
+        ordering = ("-created_at",)
+        constraints = (
+            models.UniqueConstraint(
+                fields=["item", "customer"], name="unique_review_per_customer_item"
+            ),
+        )
+
+    def __str__(self) -> str:
+        return f"{self.customer.full_name}: {self.item.name} ({self.rating}/5)"

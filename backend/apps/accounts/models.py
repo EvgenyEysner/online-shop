@@ -30,6 +30,13 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    notifications_last_seen_at = models.DateTimeField(
+        "Benachrichtigungen zuletzt gesehen am",
+        null=True,
+        blank=True,
+        help_text="Gesetzt von UserMeViewSet.mark_notifications_seen() - "
+        "Ereignisse mit occurred_at danach gelten als ungelesen. None bedeutet: alle Ereignisse sind ungelesen.",
+    )
 
     is_staff = models.BooleanField(
         "staff status",

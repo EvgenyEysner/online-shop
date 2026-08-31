@@ -3,7 +3,6 @@ import re
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import List, Tuple
 
 import environ
 from corsheaders.defaults import default_methods
@@ -19,9 +18,9 @@ BASE_DIR = Path(__file__).resolve(strict=True).parent.parent
 environ.Env.read_env(os.path.join(BASE_DIR, "../.env"))
 SECRET_KEY: str = env("SECRET_KEY")
 DEBUG: bool = env("DEBUG")
-ALLOWED_HOSTS: List[str] = env("ALLOWED_HOSTS").split(",")
+ALLOWED_HOSTS: list[str] = env("ALLOWED_HOSTS").split(",")
 
-DJANGO_APPS: Tuple[str, ...] = (
+DJANGO_APPS: tuple[str, ...] = (
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -30,7 +29,7 @@ DJANGO_APPS: Tuple[str, ...] = (
     "django.contrib.staticfiles",
 )
 
-THIRD_PARTY_APPS: Tuple[str, ...] = (
+THIRD_PARTY_APPS: tuple[str, ...] = (
     "unfold",  # muss vor django.contrib.admin laden
     "rest_framework",
     "daphne",
@@ -40,12 +39,12 @@ THIRD_PARTY_APPS: Tuple[str, ...] = (
     "drf_spectacular",
 )
 
-LOCAL_APPS: Tuple[str, ...] = ("apps.accounts", "apps.orders", "apps.core")
+LOCAL_APPS: tuple[str, ...] = ("apps.accounts", "apps.orders", "apps.core")
 INSTALLED_APPS = THIRD_PARTY_APPS + DJANGO_APPS + LOCAL_APPS
 
 AUTH_USER_MODEL = "accounts.CustomUser"
 
-MIDDLEWARE: List[str] = [
+MIDDLEWARE: list[str] = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -141,7 +140,7 @@ CORS_URLS_REGEX = "/api/.*"
 
 CORS_ALLOW_METHODS = default_methods
 
-CORS_ALLOWED_ORIGINS: List[str] = env.list(
+CORS_ALLOWED_ORIGINS: list[str] = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=[
         "http://localhost:3000",
@@ -196,6 +195,10 @@ MEDIA_ROOT = BASE_DIR / env("DJANGO_MEDIA_ROOT", default="media")
 API_DOCS_ENABLED: bool = env.bool("API_DOCS_ENABLED", default=True)
 
 FRONTEND_URL: str = env("FRONTEND_URL", default="http://localhost:3000")
+# 1 Stunde statt Django-Default (3 Tage) - Passwort-Reset ist sicherheitskritisch,
+# ein enges Zeitfenster reduziert das Risiko eines abgefangenen/weitergeleiteten
+# Reset-Links (siehe ADR 0018).
+PASSWORD_RESET_TIMEOUT = 3600
 STRIPE_SECRET_KEY: str = env("STRIPE_SECRET_KEY", default="")
 STRIPE_PUBLIC_KEY: str = env("STRIPE_PUBLIC_KEY", default="")
 STRIPE_WEBHOOK_SECRET: str = env("STRIPE_WEBHOOK_SECRET", default="")
@@ -272,6 +275,42 @@ if not re.fullmatch(r"[a-z]{3}", CURRENCY):
         f"CURRENCY muss ein 3-stelliger ISO-4217-Code sein (z. B. 'eur'), "
         f"erhalten: {CURRENCY!r}"
     )
+
+# --- Firmenstammdaten (Pflichtangaben Rechnung, §14 Abs. 4 UStG) ---- #
+COMPANY_NAME = env("COMPANY_NAME")
+COMPANY_STREET = env("COMPANY_STREET")
+COMPANY_ZIP = env("COMPANY_ZIP")
+COMPANY_CITY = env("COMPANY_CITY")
+COMPANY_COUNTRY = env("COMPANY_COUNTRY", default="Deutschland")
+COMPANY_TAX_ID = env("COMPANY_TAX_ID")  # Steuernummer oder USt-IdNr.
+
+# --- Zusätzliche Pflichtangaben Impressum (§5 TMG, siehe ADR 0014) --- #
+COMPANY_EMAIL = env("COMPANY_EMAIL")
+COMPANY_PHONE = env("COMPANY_PHONE")
+COMPANY_MANAGING_DIRECTOR = env("COMPANY_MANAGING_DIRECTOR", default="")
+COMPANY_REGISTER_COURT = env("COMPANY_REGISTER_COURT", default="")
+COMPANY_REGISTER_NUMBER = env("COMPANY_REGISTER_NUMBER", default="")
+
+INVOICE_NUMBER_KEY = env("INVOICE_NUMBER_KEY", default="invoice_number")
+INVOICE_NUMBER_START = env.int("INVOICE_NUMBER_START", default=1)
+
+# --- Gutschriften/Korrekturrechnungen (siehe ADR 0016) --------------- #
+CREDIT_NOTE_NUMBER_KEY = env("CREDIT_NOTE_NUMBER_KEY", default="credit_note_number")
+CREDIT_NOTE_NUMBER_START = env.int("CREDIT_NOTE_NUMBER_START", default=1)
+
+# --- E-Mail (Rechnungsversand, siehe ADR 0011) ----------------------- #
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = env("EMAIL_HOST")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")
+
+# --- Celery (asynchroner Rechnungsversand, siehe ADR 0011) ---------- #
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://redis:6379/0")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://redis:6379/1")
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

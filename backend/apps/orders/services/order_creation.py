@@ -1,9 +1,10 @@
 from django.db import IntegrityError, transaction
 from django.db.models import F
 
+from apps.core.services.allocation import NumberAllocationService
 from apps.orders.exceptions import InsufficientStockError
 from apps.orders.models import Item, Order, OrderItem
-from apps.core.services.allocation import NumberAllocationService
+
 from .pricing import PricingService
 
 
@@ -43,6 +44,15 @@ class OrderCreationService:
         shipping = payload["shipping"]
         billing = payload.get("billing") or shipping
 
+        # Order wird zunächst nie direkt als "paid" angelegt - der
+        # Übergang zu "paid" (inkl. paid_at + Rechnungserstellung) läuft
+        # ausschließlich über OrderService.mark_as_paid(), damit dieser
+        # Schreibpfad nicht am zentralen Trigger vorbeiläuft.
+        should_mark_paid = payment_status == Order.PaymentStatus.PAID
+        initial_status = (
+            Order.PaymentStatus.PENDING if should_mark_paid else payment_status
+        )
+
         try:
             order = Order.objects.create(
                 order_number=NumberAllocationService.allocate_order_number(),
@@ -72,7 +82,7 @@ class OrderCreationService:
                 billing_city=billing.get("city", ""),
                 billing_country=billing.get("country", ""),
                 payment_method=payload.get("payment_method", Order.PaymentMethod.CARD),
-                payment_status=payment_status,
+                payment_status=initial_status,
                 stripe_session_id=stripe_session_id,
                 stripe_payment_intent_id=stripe_payment_intent_id or "",
                 subtotal=totals["subtotal"],
@@ -108,7 +118,20 @@ class OrderCreationService:
             ]
         )
 
-        return OrderCreationService._reload(order.pk)
+        order = OrderCreationService._reload(order.pk)
+        if should_mark_paid:
+            from apps.orders.services.order import OrderService
+
+            OrderService.mark_as_paid(order)
+
+        # Bestellbestätigung sofort bei Order Erstellung, unabhängig vom
+        # Zahlungsstatus ausschließlich im "neu
+        # angelegt" Zweig, NICHT in _update_existing (würde sonst eine
+        # zweite Bestätigung auslösen).
+        from apps.orders.tasks import send_order_confirmation_email
+
+        send_order_confirmation_email.delay(order.pk)
+        return order
 
     @staticmethod
     @transaction.atomic
@@ -182,17 +205,20 @@ class OrderCreationService:
         order: Order, *, payment_status: str, stripe_payment_intent_id: str
     ) -> Order:
         updates = []
-        if (
-            payment_status == Order.PaymentStatus.PAID
-            and order.payment_status != Order.PaymentStatus.PAID
-        ):
-            order.payment_status = Order.PaymentStatus.PAID
-            updates.append("payment_status")
         if stripe_payment_intent_id and not order.stripe_payment_intent_id:
             order.stripe_payment_intent_id = stripe_payment_intent_id
             updates.append("stripe_payment_intent_id")
         if updates:
             order.save(update_fields=updates)
+
+        if (
+            payment_status == Order.PaymentStatus.PAID
+            and order.payment_status != Order.PaymentStatus.PAID
+        ):
+            from apps.orders.services.order import OrderService
+
+            OrderService.mark_as_paid(order)
+
         return order
 
     @staticmethod
