@@ -1,23 +1,30 @@
 "use client";
-import {useState} from "react";
+import {FormEvent, useEffect, useState} from "react";
 import {
-  ArrowLeft,
-  CheckCircle,
-  ChevronDown,
-  ChevronUp,
-  Euro,
-  Info,
-  Leaf,
-  Shield,
-  ShoppingCart,
-  Star,
-  Sun,
-  TrendingUp,
-  Zap
+    ArrowLeft,
+    CheckCircle,
+    ChevronDown,
+    ChevronUp,
+    Euro,
+    Info,
+    Leaf,
+    Loader2,
+    MessageSquareText,
+    Pencil,
+    Shield,
+    ShoppingCart,
+    Star,
+    Sun,
+    Trash2,
+    TrendingUp,
+    Zap
 } from "lucide-react";
 import {ImageWithFallback} from "@/src/components/figma/ImageWithFallback";
 import {Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
 
+import {useApp} from "@/src/providers/AppProvider";
+import {ApiError} from "@/src/lib/api";
+import {deleteReview, fetchReviewsForItem, submitReview, type Review} from "@/src/lib/reviews";
 import type {CatalogProduct} from "@/src/types/catalog";
 
 interface ProductDetailProps {
@@ -56,6 +63,42 @@ const MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", 
 export function ProductDetail({product, onBack, onAddToCart}: ProductDetailProps) {
     const [qty, setQty] = useState(1);
     const [addedPulse, setAddedPulse] = useState(false);
+
+    // Bewertungen (siehe ADR 0019)
+    const {user, isLoggedIn} = useApp();
+    const [reviews, setReviews] = useState<Review[]>([]);
+    const [reviewsLoading, setReviewsLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        setReviewsLoading(true);
+        fetchReviewsForItem(product.id)
+            .then((data) => {
+                if (!cancelled) setReviews(data);
+            })
+            .catch(() => {
+                if (!cancelled) setReviews([]);
+            })
+            .finally(() => {
+                if (!cancelled) setReviewsLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [product.id]);
+
+    const ownReview = user ? reviews.find((r) => r.customer_id === user.id) ?? null : null;
+
+    const handleReviewSubmitted = (review: Review) => {
+        setReviews((current) => {
+            const withoutOwn = current.filter((r) => r.id !== review.id);
+            return [review, ...withoutOwn];
+        });
+    };
+
+    const handleReviewDeleted = (reviewId: number) => {
+        setReviews((current) => current.filter((r) => r.id !== reviewId));
+    };
 
     // Configurator state
     const [moduleCount, setModuleCount] = useState(12);
@@ -502,7 +545,261 @@ export function ProductDetail({product, onBack, onAddToCart}: ProductDetailProps
                         </div>
                     )}
                 </div>
+
+                {/* Bewertungen (siehe ADR 0019) */}
+                <div className="bg-card border border-border rounded-xl p-6 mb-8">
+                    <div className="flex items-center gap-2 mb-5">
+                        <MessageSquareText size={18} className="text-accent"/>
+                        <h2 className="text-foreground"
+                            style={{fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1rem"}}>
+                            Bewertungen ({product.reviews})
+                        </h2>
+                    </div>
+
+                    {isLoggedIn ? (
+                        <ReviewForm
+                            itemId={product.id}
+                            existingReview={ownReview}
+                            onSaved={handleReviewSubmitted}
+                            onDeleted={handleReviewDeleted}
+                        />
+                    ) : (
+                        <p className="text-muted-foreground text-xs mb-5">
+                            Bitte melden Sie sich an, um eine Bewertung abzugeben.
+                        </p>
+                    )}
+
+                    <ReviewList reviews={reviews} loading={reviewsLoading} ownUserId={user?.id ?? null}/>
+                </div>
             </div>
         </div>
+    );
+}
+
+function StarRatingDisplay({rating, size = 14}: { rating: number; size?: number }) {
+    return (
+        <div className="flex">
+            {Array.from({length: 5}).map((_, i) => (
+                <Star key={i} size={size}
+                      className={i < Math.round(rating) ? "text-accent fill-accent" : "text-muted-foreground"}/>
+            ))}
+        </div>
+    );
+}
+
+function ReviewList({reviews, loading, ownUserId}: {
+    reviews: Review[];
+    loading: boolean;
+    ownUserId: number | null;
+}) {
+    if (loading) {
+        return (
+            <div className="flex items-center gap-2 text-muted-foreground text-xs py-4">
+                <Loader2 size={14} className="animate-spin"/>
+                Bewertungen werden geladen…
+            </div>
+        );
+    }
+
+    const others = reviews.filter((r) => r.customer_id !== ownUserId);
+
+    if (others.length === 0) {
+        return (
+            <p className="text-muted-foreground text-xs py-2">
+                Für diesen Artikel liegen noch keine Bewertungen vor.
+            </p>
+        );
+    }
+
+    return (
+        <div className="space-y-4 mt-2">
+            {others.map((review) => (
+                <div key={review.id} className="border-t border-border pt-4 first:border-t-0 first:pt-0">
+                    <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-foreground text-sm font-semibold">{review.customer}</span>
+                        <span className="text-muted-foreground text-xs">
+              {new Date(review.created_at).toLocaleDateString("de-DE")}
+            </span>
+                    </div>
+                    <StarRatingDisplay rating={review.rating}/>
+                    {review.comment && (
+                        <p className="text-muted-foreground text-sm leading-relaxed mt-2">{review.comment}</p>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function ReviewForm({itemId, existingReview, onSaved, onDeleted}: {
+    itemId: number;
+    existingReview: Review | null;
+    onSaved: (review: Review) => void;
+    onDeleted: (reviewId: number) => void;
+}) {
+    const [editing, setEditing] = useState(false);
+    const [rating, setRating] = useState(existingReview?.rating ?? 0);
+    const [hoverRating, setHoverRating] = useState(0);
+    const [comment, setComment] = useState(existingReview?.comment ?? "");
+    const [error, setError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const startEditing = () => {
+        setRating(existingReview?.rating ?? 0);
+        setComment(existingReview?.comment ?? "");
+        setError(null);
+        setEditing(true);
+    };
+
+    const handleSubmit = async (event: FormEvent) => {
+        event.preventDefault();
+        setError(null);
+
+        if (rating < 1) {
+            setError("Bitte wählen Sie eine Sternebewertung aus.");
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const review = await submitReview(itemId, rating, comment.trim());
+            onSaved(review);
+            setEditing(false);
+        } catch (err) {
+            if (err instanceof ApiError && err.status === 403) {
+                setError("Sie können nur Artikel bewerten, die Sie bereits gekauft haben.");
+            } else {
+                const message =
+                    err instanceof ApiError
+                        ? [...err.generalErrors, ...Object.values(err.fieldErrors).flat()].join(" ") ||
+                        err.message
+                        : "Bewertung konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.";
+                setError(message);
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!existingReview) return;
+        setIsDeleting(true);
+        setError(null);
+        try {
+            await deleteReview(existingReview.id);
+            onDeleted(existingReview.id);
+            setEditing(false);
+        } catch {
+            setError("Bewertung konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    if (existingReview && !editing) {
+        return (
+            <div className="mb-5 p-4 bg-muted/20 border border-border rounded-lg">
+                <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-foreground text-sm font-semibold">Ihre Bewertung</span>
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            type="button"
+                            onClick={startEditing}
+                            className="p-1.5 rounded hover:bg-muted text-muted-foreground"
+                            title="Bewertung bearbeiten"
+                        >
+                            <Pencil size={14}/>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleDelete}
+                            disabled={isDeleting}
+                            className="p-1.5 rounded hover:bg-muted text-destructive disabled:opacity-50"
+                            title="Bewertung löschen"
+                        >
+                            {isDeleting ? <Loader2 size={14} className="animate-spin"/> : <Trash2 size={14}/>}
+                        </button>
+                    </div>
+                </div>
+                <StarRatingDisplay rating={existingReview.rating}/>
+                {existingReview.comment && (
+                    <p className="text-muted-foreground text-sm leading-relaxed mt-2">{existingReview.comment}</p>
+                )}
+                {error && <p className="text-destructive text-xs mt-2">{error}</p>}
+            </div>
+        );
+    }
+
+    return (
+        <form onSubmit={handleSubmit}
+              className="mb-5 p-4 bg-muted/20 border border-border rounded-lg space-y-3">
+            <div>
+                <label className="text-foreground text-sm font-semibold block mb-2">
+                    {existingReview ? "Bewertung bearbeiten" : "Artikel bewerten"}
+                </label>
+                <div className="flex gap-1">
+                    {Array.from({length: 5}).map((_, i) => {
+                        const value = i + 1;
+                        const filled = value <= (hoverRating || rating);
+                        return (
+                            <button
+                                key={value}
+                                type="button"
+                                onClick={() => setRating(value)}
+                                onMouseEnter={() => setHoverRating(value)}
+                                onMouseLeave={() => setHoverRating(0)}
+                                disabled={isSubmitting}
+                                aria-label={`${value} von 5 Sternen`}
+                                className="p-0.5"
+                            >
+                                <Star size={22} className={filled ? "text-accent fill-accent" : "text-muted-foreground"}/>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                rows={3}
+                maxLength={1000}
+                disabled={isSubmitting}
+                placeholder="Ihre Erfahrung mit diesem Artikel (optional) …"
+                className="w-full px-3 py-2.5 bg-input-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-60 resize-none"
+            />
+
+            {error && (
+                <div className="p-2.5 bg-destructive/10 border border-destructive/30 rounded-lg text-xs text-destructive">
+                    {error}
+                </div>
+            )}
+
+            <div className="flex items-center gap-2">
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-bold text-sm rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-60"
+                    style={{fontFamily: "var(--font-display)"}}
+                >
+                    {isSubmitting && <Loader2 size={14} className="animate-spin"/>}
+                    {existingReview ? "Speichern" : "Bewertung absenden"}
+                </button>
+                {existingReview && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setEditing(false);
+                            setError(null);
+                        }}
+                        disabled={isSubmitting}
+                        className="px-4 py-2 text-muted-foreground text-sm font-semibold rounded-lg hover:bg-muted transition-colors"
+                    >
+                        Abbrechen
+                    </button>
+                )}
+            </div>
+        </form>
     );
 }

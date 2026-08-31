@@ -36,6 +36,10 @@ export interface CreateCheckoutSessionResponse {
 export interface ConfirmedOrderItem {
   id: number;
   item: string | null;
+  // Rohe Artikel-ID zusätzlich zum Namen (item) - ermöglicht das
+  // Nachladen der aktuellen Artikeldaten für "Erneut bestellen" (siehe
+  // ADR 0020). OrderItem.item ist nullable (kann theoretisch fehlen).
+  item_id: number | null;
   item_name: string;
   unit_price: string;
   quantity: number;
@@ -65,6 +69,14 @@ export interface ConfirmedOrder {
   total: string;
   items: ConfirmedOrderItem[];
   created_at: string;
+  paid_at: string | null;
+  fulfillment_status: string;
+  tracking_number: string;
+  carrier: string;
+  shipped_at: string | null;
+  delivered_at: string | null;
+  has_invoice: boolean;
+  can_request_return: boolean;
 }
 
 export async function createCheckoutSession(

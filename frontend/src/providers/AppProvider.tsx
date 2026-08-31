@@ -18,7 +18,7 @@ export interface CartItem {
     qty: number;
 }
 
-interface AppContextValue {
+export interface AppContextValue {
     // Cart
     cart: CartItem[];
     cartCount: number;

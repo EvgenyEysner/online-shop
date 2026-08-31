@@ -5,18 +5,58 @@ import { getUserDisplayName, getUserInitials } from "@/src/types/user";
 import {
   LayoutDashboard, ShoppingBag, FileText, Zap, ChevronRight,
   Download, CheckCircle, Clock, Package, AlertCircle,
-  Sun, TrendingUp, Euro, LogOut, Bell, X
+  Sun, TrendingUp, Euro, LogOut, Bell, X, RotateCcw, Loader2
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
 } from "recharts";
 import { DemoDataBadge } from "@/src/components/DemoDataBadge";
+import { useApp } from "@/src/providers/AppProvider";
+import {
+  downloadInvoicePdf,
+  fetchMyInvoices,
+  type Invoice,
+} from "@/src/lib/invoices";
 import {
   fetchMyOrders,
   isActiveOrder,
+  reorder,
   ORDER_STATUS_LABELS,
   type ConfirmedOrder,
 } from "@/src/lib/orders";
+import {
+  fetchMyReturnRequests,
+  RETURN_REQUEST_STATUS_LABELS,
+  type ReturnRequest,
+} from "@/src/lib/returns";
+import {
+  fetchNotifications,
+  markNotificationsSeen,
+  type NotificationEvent,
+} from "@/src/lib/notifications";
+import { ReturnRequestModal } from "@/src/components/ReturnRequestModal";
+
+const NOTIFICATION_ICONS: Record<NotificationEvent["kind"], typeof Bell> = {
+  order_created: ShoppingBag,
+  order_paid: Euro,
+  order_shipped: Package,
+  order_delivered: CheckCircle,
+  invoice_issued: FileText,
+  return_status_changed: RotateCcw,
+};
+
+function formatRelativeTime(isoDate: string): string {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return "";
+  const diffMin = Math.round((Date.now() - date.getTime()) / 60000);
+  if (diffMin < 1) return "gerade eben";
+  if (diffMin < 60) return `vor ${diffMin} Min.`;
+  const diffHours = Math.round(diffMin / 60);
+  if (diffHours < 24) return `vor ${diffHours} Std.`;
+  const diffDays = Math.round(diffHours / 24);
+  if (diffDays < 30) return `vor ${diffDays} Tag${diffDays === 1 ? "" : "en"}`;
+  return date.toLocaleDateString("de-DE");
+}
 
 const pvMonthlyData = [
   { month: "Jan", kwh: 120, eur: 43 },
@@ -44,12 +84,6 @@ const dailyData = [
   { time: "20:00", kw: 0.0 },
 ];
 
-const INVOICES = [
-  { id: "RE-2025-089", orderRef: "K39-2024-0089", date: "12.06.2025", amount: 3917.00, paid: true },
-  { id: "RE-2025-094", orderRef: "K39-2024-0094", date: "03.06.2025", amount: 4299.00, paid: true },
-  { id: "RE-2025-101", orderRef: "K39-2024-0101", date: "15.06.2025", amount: 393.50, paid: false },
-];
-
 const paymentStatusConfig = {
   paid: { color: "text-green-600", bg: "bg-green-50 border-green-200", icon: CheckCircle },
   pending: { color: "text-amber-600", bg: "bg-amber-50 border-amber-200", icon: Clock },
@@ -70,17 +104,34 @@ interface TimelineStep {
 }
 
 function buildOrderTimeline(order: ConfirmedOrder): TimelineStep[] {
-  const placed: TimelineStep = {
-    label: "Bestellung eingegangen",
-    done: true,
-    date: formatOrderDate(order.created_at),
-  };
-  const paid: TimelineStep = {
-    label: "Zahlung bestätigt",
-    done: order.payment_status === "paid",
-    date: order.payment_status === "paid" ? formatOrderDate(order.created_at) : "",
-  };
-  return [placed, paid];
+  const steps: TimelineStep[] = [
+    { label: "Bestellung eingegangen", done: true, date: formatOrderDate(order.created_at) },
+    {
+      label: "Zahlung bestätigt",
+      done: !!order.paid_at,
+      date: order.paid_at ? formatOrderDate(order.paid_at) : "",
+    },
+  ];
+  if (order.payment_status === "paid") {
+    steps.push({
+      label: "In Bearbeitung",
+      done: order.fulfillment_status !== "pending",
+      date: "",
+    });
+    steps.push({
+      label: order.tracking_number
+        ? `Versandt (${order.carrier ?? ""} ${order.tracking_number})`
+        : "Versandt",
+      done: !!order.shipped_at,
+      date: order.shipped_at ? formatOrderDate(order.shipped_at) : "",
+    });
+    steps.push({
+      label: "Zugestellt",
+      done: !!order.delivered_at,
+      date: order.delivered_at ? formatOrderDate(order.delivered_at) : "",
+    });
+  }
+  return steps;
 }
 
 interface CustomerDashboardProps {
@@ -89,6 +140,7 @@ interface CustomerDashboardProps {
 }
 
 export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
+  const { addToCart } = useApp();
   const [activeTab, setActiveTab] = useState("overview");
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -96,6 +148,21 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
   const [orders, setOrders] = useState<ConfirmedOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersError, setOrdersError] = useState<string | null>(null);
+
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(true);
+  const [invoicesError, setInvoicesError] = useState<string | null>(null);
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<number | null>(null);
+
+  const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
+  const [returnModalOrder, setReturnModalOrder] = useState<ConfirmedOrder | null>(null);
+
+  const [reorderingOrderId, setReorderingOrderId] = useState<number | null>(null);
+  const [reorderFeedback, setReorderFeedback] = useState<string | null>(null);
+
+  const [notifications, setNotifications] = useState<NotificationEvent[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,6 +186,121 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyInvoices()
+      .then((data) => {
+        if (cancelled) return;
+        setInvoices(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setInvoicesError(
+            err instanceof Error ? err.message : "Fehler beim Laden der Rechnungen"
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setInvoicesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyReturnRequests()
+      .then((data) => {
+        if (!cancelled) setReturnRequests(data);
+      })
+      .catch(() => {
+        // Rückgabe-Status ist eine ergänzende Anzeige - ein Fehler hier
+        // soll das übrige Dashboard nicht blockieren.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Benachrichtigungsglocke (siehe ADR 0021): einmaliger Abruf beim
+  // Öffnen des Dashboards, bewusst kein Live-Polling/WebSocket.
+  useEffect(() => {
+    let cancelled = false;
+    fetchNotifications()
+      .then((data) => {
+        if (cancelled) return;
+        setNotifications(data.results);
+        setUnreadCount(data.unread_count);
+      })
+      .catch(() => {
+        // Ergänzende Anzeige - ein Fehler hier soll das übrige Dashboard
+        // nicht blockieren.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function latestReturnRequestForOrder(orderId: number): ReturnRequest | undefined {
+    return returnRequests.find((r) => r.order === orderId);
+  }
+
+  async function handleToggleNotifications() {
+    const opening = !notifOpen;
+    setNotifOpen(opening);
+    if (!opening || unreadCount === 0) return;
+
+    setUnreadCount(0);
+    setNotifications((current) => current.map((n) => ({ ...n, read: true })));
+    try {
+      await markNotificationsSeen();
+    } catch {
+      // Best effort - beim nächsten Laden des Dashboards wird der
+      // Gelesen-Status ohnehin serverseitig neu berechnet.
+    }
+  }
+
+  async function handleReorder(order: ConfirmedOrder) {
+    setReorderingOrderId(order.id);
+    setReorderFeedback(null);
+    try {
+      const result = await reorder(order, addToCart);
+      if (result.unavailable.length > 0) {
+        const addedText =
+          result.addedCount > 0
+            ? `${result.addedCount} Artikel wurden in den Warenkorb gelegt.`
+            : "Es konnte kein Artikel in den Warenkorb gelegt werden.";
+        setReorderFeedback(
+          `${addedText} ${result.unavailable.length} Artikel nicht verfügbar: ${result.unavailable.join(", ")}.`
+        );
+      } else if (result.addedCount > 0) {
+        setReorderFeedback(`${result.addedCount} Artikel wurden erneut in den Warenkorb gelegt.`);
+      } else {
+        setReorderFeedback("Diese Bestellung enthält keine Artikel, die erneut bestellt werden können.");
+      }
+    } catch (err) {
+      setReorderFeedback(
+        err instanceof Error ? err.message : "Erneutes Bestellen ist fehlgeschlagen."
+      );
+    } finally {
+      setReorderingOrderId(null);
+    }
+  }
+
+  async function handleDownloadInvoice(invoiceId: number) {
+    setDownloadingInvoiceId(invoiceId);
+    try {
+      await downloadInvoicePdf(invoiceId);
+    } catch (err) {
+      setInvoicesError(
+        err instanceof Error ? err.message : "Rechnung konnte nicht heruntergeladen werden."
+      );
+    } finally {
+      setDownloadingInvoiceId(null);
+    }
+  }
 
   const tabs = [
     { key: "overview", label: "Übersicht", icon: LayoutDashboard },
@@ -243,16 +425,80 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="relative p-2 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+          <div className="flex items-center gap-2 relative">
+            <button
+              onClick={handleToggleNotifications}
+              className="relative p-2 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            >
               <Bell size={17} />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full" />
+              {unreadCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 min-w-[15px] h-[15px] px-0.5 rounded-full bg-accent text-primary text-[0.6rem] font-bold flex items-center justify-center leading-none">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
             </button>
+            {notifOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setNotifOpen(false)} />
+                <div className="absolute right-0 top-full mt-2 w-80 max-w-[90vw] bg-card border border-border rounded-xl shadow-2xl z-40 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                    <span className="text-foreground font-semibold text-sm">Benachrichtigungen</span>
+                    <button
+                      onClick={() => setNotifOpen(false)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto divide-y divide-border">
+                    {notifications.length === 0 && (
+                      <p className="text-muted-foreground text-xs px-4 py-6 text-center">
+                        Keine Benachrichtigungen vorhanden.
+                      </p>
+                    )}
+                    {notifications.map((notification, idx) => {
+                      const Icon = NOTIFICATION_ICONS[notification.kind] ?? Bell;
+                      return (
+                        <div
+                          key={`${notification.kind}-${notification.order_id}-${idx}`}
+                          className={`flex items-start gap-3 px-4 py-3 ${
+                            !notification.read ? "bg-accent/5" : ""
+                          }`}
+                        >
+                          <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5">
+                            <Icon size={13} className="text-accent" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-foreground text-xs leading-snug">
+                              {notification.message}
+                            </p>
+                            <p className="text-muted-foreground text-[0.65rem] mt-0.5">
+                              {formatRelativeTime(notification.occurred_at)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </header>
 
         {/* Content */}
         <main className="flex-1 p-4 md:p-6 overflow-auto">
+          {reorderFeedback && (
+            <div className="mb-4 flex items-start justify-between gap-3 px-4 py-3 rounded-lg border border-accent/30 bg-accent/10 text-sm text-foreground">
+              <span>{reorderFeedback}</span>
+              <button
+                onClick={() => setReorderFeedback(null)}
+                className="text-muted-foreground hover:text-foreground shrink-0"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           {/* OVERVIEW */}
           {activeTab === "overview" && (
@@ -337,7 +583,15 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
                   <p className="text-muted-foreground text-sm">Noch keine Bestellungen vorhanden.</p>
                 )}
                 {latestOrder && (
-                  <OrderCard order={latestOrder} expanded={true} onToggle={() => {}} />
+                  <OrderCard
+                    order={latestOrder}
+                    expanded={true}
+                    onToggle={() => {}}
+                    returnRequest={latestReturnRequestForOrder(latestOrder.id)}
+                    onRequestReturn={setReturnModalOrder}
+                    onReorder={handleReorder}
+                    reordering={reorderingOrderId === latestOrder.id}
+                  />
                 )}
               </div>
 
@@ -392,6 +646,10 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
                   order={order}
                   expanded={expandedOrder === order.id}
                   onToggle={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                  returnRequest={latestReturnRequestForOrder(order.id)}
+                  onRequestReturn={setReturnModalOrder}
+                  onReorder={handleReorder}
+                  reordering={reorderingOrderId === order.id}
                 />
               ))}
             </div>
@@ -400,57 +658,53 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
           {/* INVOICES */}
           {activeTab === "invoices" && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <h2 className="text-foreground" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1rem" }}>
-                  Rechnungen
-                </h2>
-                <DemoDataBadge />
-              </div>
-              <p className="text-muted-foreground text-xs">
-                Diese Ansicht zeigt aktuell Beispieldaten – die Rechnungsanbindung folgt,
-                sobald eine entsprechende Datenquelle existiert.
-              </p>
-              <div className="bg-card border border-border rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/50">
-                      <th className="text-left px-5 py-3 text-muted-foreground font-semibold" style={{ fontSize: "0.75rem", letterSpacing: "0.05em" }}>RECHNUNGSNR.</th>
-                      <th className="text-left px-5 py-3 text-muted-foreground font-semibold" style={{ fontSize: "0.75rem", letterSpacing: "0.05em" }}>BESTELLUNG</th>
-                      <th className="text-left px-5 py-3 text-muted-foreground font-semibold hidden md:table-cell" style={{ fontSize: "0.75rem", letterSpacing: "0.05em" }}>DATUM</th>
-                      <th className="text-right px-5 py-3 text-muted-foreground font-semibold" style={{ fontSize: "0.75rem", letterSpacing: "0.05em" }}>BETRAG</th>
-                      <th className="text-center px-5 py-3 text-muted-foreground font-semibold" style={{ fontSize: "0.75rem", letterSpacing: "0.05em" }}>STATUS</th>
-                      <th className="px-5 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {INVOICES.map((inv, idx) => (
-                      <tr key={inv.id} className={`border-b border-border last:border-0 hover:bg-muted/30 transition-colors ${idx % 2 === 0 ? "" : "bg-muted/10"}`}>
-                        <td className="px-5 py-3.5 font-mono text-foreground" style={{ fontSize: "0.83rem" }}>{inv.id}</td>
-                        <td className="px-5 py-3.5 text-muted-foreground" style={{ fontSize: "0.83rem" }}>{inv.orderRef}</td>
-                        <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell" style={{ fontSize: "0.83rem" }}>{inv.date}</td>
-                        <td className="px-5 py-3.5 text-right text-foreground font-semibold" style={{ fontFamily: "var(--font-display)", fontSize: "0.9rem" }}>
-                          {inv.amount.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
-                        </td>
-                        <td className="px-5 py-3.5 text-center">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                            inv.paid
-                              ? "bg-green-50 text-green-700 border-green-200"
-                              : "bg-amber-50 text-amber-700 border-amber-200"
-                          }`}>
-                            {inv.paid ? <CheckCircle size={11} /> : <AlertCircle size={11} />}
-                            {inv.paid ? "Bezahlt" : "Offen"}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <button className="flex items-center gap-1 text-accent hover:text-accent/80 transition-colors text-xs font-semibold">
-                            <Download size={13} /> PDF
-                          </button>
-                        </td>
+              <h2 className="text-foreground" style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "1rem" }}>
+                Rechnungen
+              </h2>
+              {invoicesLoading && (
+                <p className="text-muted-foreground text-sm">Rechnungen werden geladen …</p>
+              )}
+              {invoicesError && (
+                <p className="text-destructive text-sm">{invoicesError}</p>
+              )}
+              {!invoicesLoading && !invoicesError && invoices.length === 0 && (
+                <p className="text-muted-foreground text-sm">Noch keine Rechnungen vorhanden.</p>
+              )}
+              {!invoicesLoading && !invoicesError && invoices.length > 0 && (
+                <div className="bg-card border border-border rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/50">
+                        <th className="text-left px-5 py-3 text-muted-foreground font-semibold" style={{ fontSize: "0.75rem", letterSpacing: "0.05em" }}>RECHNUNGSNR.</th>
+                        <th className="text-left px-5 py-3 text-muted-foreground font-semibold hidden md:table-cell" style={{ fontSize: "0.75rem", letterSpacing: "0.05em" }}>DATUM</th>
+                        <th className="text-right px-5 py-3 text-muted-foreground font-semibold" style={{ fontSize: "0.75rem", letterSpacing: "0.05em" }}>BETRAG</th>
+                        <th className="px-5 py-3" />
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {invoices.map((inv, idx) => (
+                        <tr key={inv.id} className={`border-b border-border last:border-0 hover:bg-muted/30 transition-colors ${idx % 2 === 0 ? "" : "bg-muted/10"}`}>
+                          <td className="px-5 py-3.5 font-mono text-foreground" style={{ fontSize: "0.83rem" }}>{inv.invoice_number}</td>
+                          <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell" style={{ fontSize: "0.83rem" }}>{formatOrderDate(inv.issued_at)}</td>
+                          <td className="px-5 py-3.5 text-right text-foreground font-semibold" style={{ fontFamily: "var(--font-display)", fontSize: "0.9rem" }}>
+                            {Number(inv.total_amount).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <button
+                              onClick={() => handleDownloadInvoice(inv.id)}
+                              disabled={downloadingInvoiceId === inv.id}
+                              className="flex items-center gap-1 text-accent hover:text-accent/80 transition-colors text-xs font-semibold disabled:opacity-50"
+                            >
+                              <Download size={13} />
+                              {downloadingInvoiceId === inv.id ? "Lädt …" : "PDF"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -547,14 +801,36 @@ export function CustomerDashboard({ onLogout, user }: CustomerDashboardProps) {
           )}
         </main>
       </div>
+
+      {returnModalOrder && (
+        <ReturnRequestModal
+          order={returnModalOrder}
+          onClose={() => setReturnModalOrder(null)}
+          onSubmitted={(returnRequest) =>
+            setReturnRequests((current) => [returnRequest, ...current])
+          }
+        />
+      )}
     </div>
   );
 }
 
-function OrderCard({ order, expanded, onToggle }: {
+function OrderCard({
+  order,
+  expanded,
+  onToggle,
+  returnRequest,
+  onRequestReturn,
+  onReorder,
+  reordering,
+}: {
   order: ConfirmedOrder;
   expanded: boolean;
   onToggle: () => void;
+  returnRequest?: ReturnRequest;
+  onRequestReturn: (order: ConfirmedOrder) => void;
+  onReorder: (order: ConfirmedOrder) => void;
+  reordering: boolean;
 }) {
   const status = paymentStatusConfig[order.payment_status as keyof typeof paymentStatusConfig] ?? paymentStatusConfig.pending;
   const statusLabel =
@@ -577,6 +853,12 @@ function OrderCard({ order, expanded, onToggle }: {
               <StatusIcon size={10} />
               {statusLabel}
             </span>
+            {returnRequest && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border bg-blue-50 border-blue-200 text-blue-600">
+                <RotateCcw size={10} />
+                {RETURN_REQUEST_STATUS_LABELS[returnRequest.status]}
+              </span>
+            )}
           </div>
           <p className="text-muted-foreground text-xs truncate">{itemsSummary}</p>
           <p className="text-muted-foreground text-xs mt-0.5">{formatOrderDate(order.created_at)}</p>
@@ -585,6 +867,18 @@ function OrderCard({ order, expanded, onToggle }: {
           <div className="text-foreground font-bold text-right" style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem" }}>
             {Number(order.total).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
           </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onReorder(order);
+            }}
+            disabled={reordering}
+            className="flex items-center gap-1.5 text-accent hover:text-accent/80 transition-colors text-xs font-semibold disabled:opacity-50 shrink-0"
+          >
+            {reordering ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+            <span className="hidden sm:inline">Erneut bestellen</span>
+          </button>
           <ChevronRight size={16} className={`text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
         </div>
       </div>
@@ -633,6 +927,39 @@ function OrderCard({ order, expanded, onToggle }: {
               </p>
             )}
           </div>
+
+          {(order.can_request_return || returnRequest) && (
+            <div className="mt-6 pt-5 border-t border-border">
+              <h4 className="text-foreground mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Rückgabe / Widerruf
+              </h4>
+              {returnRequest ? (
+                <div className="text-sm">
+                  <p className="text-foreground font-medium mb-1">
+                    {RETURN_REQUEST_STATUS_LABELS[returnRequest.status]}
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    Angefragt am {formatOrderDate(returnRequest.requested_at)}
+                    {returnRequest.status === "rejected" && returnRequest.rejection_note
+                      ? ` – ${returnRequest.rejection_note}`
+                      : ""}
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRequestReturn(order);
+                  }}
+                  className="flex items-center gap-1.5 text-accent hover:text-accent/80 transition-colors text-xs font-semibold"
+                >
+                  <RotateCcw size={13} />
+                  Rückgabe anfragen
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

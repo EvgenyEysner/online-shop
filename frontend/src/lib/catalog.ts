@@ -19,6 +19,7 @@ interface ApiItem {
   rating: string | number;
   reviews: number;
   specs: ProductSpec[];
+  on_stock: number;
 }
 
 function toNumber(value: string | number | null | undefined): number | undefined {
@@ -42,6 +43,7 @@ export function mapApiItem(item: ApiItem): CatalogProduct {
     watt: item.watt || undefined,
     image: item.image,
     specs: Array.isArray(item.specs) ? item.specs : [],
+    onStock: item.on_stock,
   };
 }
 
@@ -66,4 +68,22 @@ export async function fetchProducts(categorySlug?: string): Promise<CatalogProdu
 export async function fetchProduct(id: number | string): Promise<CatalogProduct> {
   const item = await apiFetch<ApiItem>(`/api/v1/orders/items/${id}/`);
   return mapApiItem(item);
+}
+
+// Mehrfach-Abruf per ID in einem Request statt N Einzelabrufen (siehe ADR
+// 0020, "Erneut bestellen"). Artikel, die inzwischen ausverkauft oder
+// gelöscht wurden, fehlen einfach im Ergebnis (ItemsViewSet.queryset
+// filtert bereits serverseitig auf on_stock > 0) - der Aufrufer erkennt
+// nicht mehr verfügbare Artikel daran, dass ihre ID nicht im Ergebnis ist.
+export async function fetchItemsByIds(ids: number[]): Promise<CatalogProduct[]> {
+  if (ids.length === 0) return [];
+  const params = new URLSearchParams({
+    id__in: ids.join(","),
+    page_size: String(ids.length),
+  });
+  const data = await apiFetch<PaginatedResponse<ApiItem> | ApiItem[]>(
+    `/api/v1/orders/items/?${params.toString()}`
+  );
+  const items = Array.isArray(data) ? data : data.results;
+  return items.map(mapApiItem);
 }

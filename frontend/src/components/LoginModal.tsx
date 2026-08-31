@@ -3,6 +3,8 @@
 import {FormEvent, useState} from "react";
 import {Loader2, Sun, X} from "lucide-react";
 import {ApiError, type ApiFieldErrors} from "@/src/lib/api";
+import {getLegalPage} from "@/src/lib/legal";
+import {requestPasswordReset} from "@/src/lib/auth";
 
 interface LoginModalProps {
     onClose: () => void;
@@ -41,12 +43,17 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
     const [regPassword, setRegPassword] = useState("");
     const [regPasswordConfirm, setRegPasswordConfirm] = useState("");
 
-    const [mode, setMode] = useState<"login" | "register">("login");
+    // Forgot-password state
+    const [forgotEmail, setForgotEmail] = useState("");
+    const [forgotSubmitted, setForgotSubmitted] = useState(false);
 
-    const switchMode = (nextMode: "login" | "register") => {
+    const [mode, setMode] = useState<"login" | "register" | "forgot">("login");
+
+    const switchMode = (nextMode: "login" | "register" | "forgot") => {
         setMode(nextMode);
         setLoginError(null);
         setRegisterErrors(emptyRegisterErrors);
+        setForgotSubmitted(false);
     };
 
     const handleSubmit = async (event: FormEvent) => {
@@ -98,6 +105,22 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
         }
     };
 
+    const handleForgotPassword = async (event: FormEvent) => {
+        event.preventDefault();
+        setIsSubmitting(true);
+
+        try {
+            await requestPasswordReset(forgotEmail.trim());
+        } catch {
+            // Bewusst ignoriert: Erfolgsmeldung wird unabhängig vom Ergebnis
+            // angezeigt (Anti-Enumeration, siehe ADR 0018) - dem Nutzer darf
+            // nie verraten werden, ob die E-Mail existiert.
+        } finally {
+            setIsSubmitting(false);
+            setForgotSubmitted(true);
+        }
+    };
+
     return (
         <div className="p-6 space-y-4">
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -129,20 +152,22 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                         </button>
                     </div>
                     {/* Tab switcher */}
-                    <div className="flex border-b border-border">
-                        <button
-                            onClick={() => switchMode("login")}
-                            className={`flex-1 py-3 text-sm font-semibold transition-colors ${mode === "login" ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
-                        >
-                            Anmelden
-                        </button>
-                        <button
-                            onClick={() => switchMode("register")}
-                            className={`flex-1 py-3 text-sm font-semibold transition-colors ${mode === "register" ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
-                        >
-                            Registrieren
-                        </button>
-                    </div>
+                    {mode !== "forgot" && (
+                        <div className="flex border-b border-border">
+                            <button
+                                onClick={() => switchMode("login")}
+                                className={`flex-1 py-3 text-sm font-semibold transition-colors ${mode === "login" ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
+                            >
+                                Anmelden
+                            </button>
+                            <button
+                                onClick={() => switchMode("register")}
+                                className={`flex-1 py-3 text-sm font-semibold transition-colors ${mode === "register" ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
+                            >
+                                Registrieren
+                            </button>
+                        </div>
+                    )}
                     {mode === "login" && (
                         <form onSubmit={handleSubmit} className="p-6 space-y-4">
                             <div>
@@ -192,7 +217,14 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                                     />
                                     Angemeldet bleiben
                                 </label>
-                                <a href="#" className="text-accent hover:underline">
+                                <a
+                                    href="#"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        switchMode("forgot");
+                                    }}
+                                    className="text-accent hover:underline"
+                                >
                                     Passwort vergessen?
                                 </a>
                             </div>
@@ -331,8 +363,10 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                             <div className="flex items-center justify-between text-xs">
                                 <p className="text-muted-foreground text-xs text-center">
                                     Mit der Registrierung akzeptieren Sie unsere{" "}
-                                    <a href="#" className="text-accent hover:underline">AGB</a> und{" "}
-                                    <a href="#" className="text-accent hover:underline">Datenschutzerklärung</a>.
+                                    <a href={`/legal/${getLegalPage("agb")?.slug}`}
+                                       className="text-accent hover:underline">AGB</a> und{" "}
+                                    <a href={`/legal/${getLegalPage("datenschutz")?.slug}`}
+                                       className="text-accent hover:underline">Datenschutzerklärung</a>.
                                 </p>
                             </div>
 
@@ -358,6 +392,73 @@ export function LoginModal({onClose, onLogin, onRegister}: LoginModalProps) {
                                     "Konto erstellen"
                                 )}
                             </button>
+                        </form>
+                    )}
+                    {mode === "forgot" && (
+                        <form onSubmit={handleForgotPassword} className="p-6 space-y-4">
+                            <p className="text-muted-foreground text-xs">
+                                Geben Sie Ihre E-Mail-Adresse ein. Falls ein Konto damit
+                                existiert, senden wir Ihnen einen Link zum Zurücksetzen
+                                Ihres Passworts.
+                            </p>
+
+                            {forgotSubmitted ? (
+                                <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg text-xs text-foreground">
+                                    Falls ein Konto mit dieser E-Mail-Adresse existiert,
+                                    haben wir Ihnen eine E-Mail mit einem Link zum
+                                    Zurücksetzen des Passworts gesendet.
+                                </div>
+                            ) : (
+                                <>
+                                    <div>
+                                        <label
+                                            htmlFor="forgot-email"
+                                            className="text-foreground text-sm font-semibold block mb-1.5"
+                                        >
+                                            E-Mail-Adresse
+                                        </label>
+                                        <input
+                                            id="forgot-email"
+                                            type="email"
+                                            value={forgotEmail}
+                                            onChange={(e) => setForgotEmail(e.target.value)}
+                                            required
+                                            autoComplete="email"
+                                            disabled={isSubmitting}
+                                            className="w-full px-3 py-2.5 bg-input-background border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={isSubmitting}
+                                        className="w-full py-3 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                                        style={{fontFamily: "var(--font-display)"}}
+                                    >
+                                        {isSubmitting ? (
+                                            <>
+                                                <Loader2 size={16} className="animate-spin"/>
+                                                Wird gesendet…
+                                            </>
+                                        ) : (
+                                            "Link anfordern"
+                                        )}
+                                    </button>
+                                </>
+                            )}
+
+                            <p className="text-center text-muted-foreground text-xs">
+                                <a
+                                    href="#"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        switchMode("login");
+                                    }}
+                                    className="text-accent font-semibold hover:underline"
+                                >
+                                    Zurück zur Anmeldung
+                                </a>
+                            </p>
                         </form>
                     )}
                 </div>
