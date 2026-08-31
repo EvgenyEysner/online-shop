@@ -116,6 +116,30 @@ export async function refreshAccessToken(): Promise<string | null> {
     }
 }
 
+export async function requestPasswordReset(email: string): Promise<void> {
+    await apiFetch<void>("/api/v1/accounts/password-reset/", {
+        method: "POST",
+        body: JSON.stringify({email}),
+    });
+}
+
+export async function confirmPasswordReset(
+    uid: string,
+    token: string,
+    password: string,
+    passwordConfirm: string
+): Promise<void> {
+    await apiFetch<void>("/api/v1/accounts/password-reset/confirm/", {
+        method: "POST",
+        body: JSON.stringify({
+            uid,
+            token,
+            password,
+            password_confirm: passwordConfirm,
+        }),
+    });
+}
+
 export async function fetchCurrentUser(
     accessToken?: string | null
 ): Promise<User> {
